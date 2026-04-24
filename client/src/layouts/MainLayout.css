@@ -1,0 +1,443 @@
+/* ===== Root layout ===== */
+.main-layout {
+  min-height: 100vh;
+}
+
+/* ===== Left Sidebar ===== */
+.main-sider {
+  position: fixed !important;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  z-index: 200;
+  background: linear-gradient(180deg, #1a1a2e 0%, #16213e 55%, #0f3460 100%) !important;
+  box-shadow: 3px 0 18px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Ant Design overrides for sider */
+.main-sider .ant-layout-sider-children {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* ===== Sider Logo ===== */
+.sider-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 64px;
+  padding: 0 18px;
+  cursor: pointer;
+  flex-shrink: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  transition: background 0.2s;
+  overflow: hidden;
+}
+
+.sider-logo:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* Project context header in the sidebar */
+.sider-project-header {
+  cursor: default;
+  gap: 8px;
+  padding: 0 12px 0 10px;
+}
+
+.sider-project-header:hover {
+  background: transparent;
+}
+
+.sider-back-btn {
+  color: rgba(255, 255, 255, 0.7) !important;
+  width: 32px !important;
+  height: 32px !important;
+  min-width: 32px !important;
+  flex-shrink: 0;
+  border-radius: 8px !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, color 0.2s;
+}
+
+.sider-back-btn:hover {
+  background: rgba(255, 255, 255, 0.12) !important;
+  color: #fff !important;
+}
+
+.sider-project-name {
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
+}
+
+.sider-logo-icon {
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  font-size: 17px;
+  box-shadow: 0 3px 10px rgba(102, 126, 234, 0.4);
+}
+
+.sider-logo-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
+}
+
+/* ===== Sider Navigation Menu ===== */
+.sider-menu {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: transparent !important;
+  border-inline-end: none !important;
+  padding: 10px 0;
+}
+
+.sider-menu::-webkit-scrollbar {
+  width: 3px;
+}
+.sider-menu::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+
+.sider-menu .ant-menu-item,
+.sider-menu .ant-menu-submenu-title {
+  color: rgba(255, 255, 255, 0.65) !important;
+  font-size: 13.5px;
+  font-weight: 500;
+  border-radius: 8px !important;
+  margin: 2px 8px !important;
+  width: calc(100% - 16px) !important;
+  transition: all 0.2s ease !important;
+}
+
+.sider-menu .ant-menu-item .anticon,
+.sider-menu .ant-menu-submenu-title .anticon {
+  font-size: 16px !important;
+  color: rgba(255, 255, 255, 0.5) !important;
+  transition: color 0.2s !important;
+}
+
+.sider-menu .ant-menu-item:hover,
+.sider-menu .ant-menu-submenu-title:hover {
+  background: rgba(255, 255, 255, 0.07) !important;
+  color: #fff !important;
+}
+
+.sider-menu .ant-menu-item:hover .anticon,
+.sider-menu .ant-menu-submenu-title:hover .anticon {
+  color: #a3b3ff !important;
+}
+
+.sider-menu .ant-menu-item-selected {
+  background: rgba(102, 126, 234, 0.2) !important;
+  color: #fff !important;
+  font-weight: 600 !important;
+}
+
+.sider-menu .ant-menu-item-selected .anticon {
+  color: #667eea !important;
+}
+
+/* Collapsed tooltip label */
+.sider-menu .ant-menu-item-selected::after {
+  border-inline-end: 3px solid #667eea !important;
+  border-radius: 2px;
+}
+
+/* Sub-menu popup (collapsed state) */
+.sider-menu .ant-menu-sub {
+  background: rgba(0, 0, 0, 0.15) !important;
+}
+
+.sider-menu .ant-menu-sub .ant-menu-item {
+  font-size: 13px !important;
+  padding-left: 46px !important;
+  color: rgba(255, 255, 255, 0.55) !important;
+}
+
+.sider-menu .ant-menu-sub .ant-menu-item:hover {
+  color: #fff !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+
+.sider-menu .ant-menu-sub .ant-menu-item-selected {
+  color: #fff !important;
+  background: rgba(102, 126, 234, 0.15) !important;
+}
+
+/* Collapsed: center icons, remove margin offset */
+.ant-layout-sider-collapsed .sider-menu .ant-menu-item,
+.ant-layout-sider-collapsed .sider-menu .ant-menu-submenu-title {
+  margin: 2px 4px !important;
+  width: calc(100% - 8px) !important;
+  padding-inline: 0 !important;
+  display: flex !important;
+  justify-content: center !important;
+}
+
+/* Group labels in project nav (dark sidebar) */
+.sider-menu .ant-menu-item-group-title {
+  color: rgba(255, 255, 255, 0.35) !important;
+  font-size: 10.5px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.8px !important;
+  padding: 10px 16px 4px !important;
+}
+
+/* Sider sub/group menu items inherit white color */
+.sider-menu .ant-menu-item-group-list .ant-menu-item {
+  color: rgba(255, 255, 255, 0.65) !important;
+}
+
+/* ===== Sider Footer (User) ===== */
+.sider-footer {
+  flex-shrink: 0;
+  padding: 10px 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.sider-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.2s;
+  overflow: hidden;
+}
+
+.sider-user:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.sider-user-avatar {
+  flex-shrink: 0;
+  background-color: #667eea !important;
+}
+
+.sider-user-info {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.sider-user-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sider-user-role {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+  text-transform: capitalize;
+}
+
+/* ===== Right side Layout ===== */
+.main-right {
+  min-height: 100vh;
+  background: var(--bg-primary, #f5f6fa);
+  /* margin handled via inline style in MainLayout.tsx (reactive to lang/collapsed) */
+}
+
+/* ===== Top Header ===== */
+.top-header {
+  position: sticky !important;
+  top: 0;
+  z-index: 100;
+  height: 60px !important;
+  line-height: 60px !important;
+  padding: 0 24px !important;
+  background: #fff !important;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.08);
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Collapse toggle button */
+.sidebar-toggle-btn {
+  width: 38px !important;
+  height: 38px !important;
+  border-radius: 9px !important;
+  font-size: 17px !important;
+  color: #595959 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0;
+}
+
+.sidebar-toggle-btn:hover {
+  background: #f0f0f0 !important;
+  color: #1677ff !important;
+}
+
+/* ===== Header Right actions ===== */
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.header-action-btn {
+  height: 34px !important;
+  padding: 0 12px !important;
+  border-radius: 8px !important;
+  font-weight: 600 !important;
+  font-size: 12.5px !important;
+  color: #595959 !important;
+  transition: all 0.2s ease !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+}
+
+.header-action-btn:hover {
+  color: #1677ff !important;
+  background: #f0f5ff !important;
+}
+
+.header-divider {
+  width: 1px;
+  height: 24px;
+  background: #f0f0f0;
+  margin: 0 4px;
+}
+
+/* User menu trigger in top header */
+.user-menu-trigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 10px 5px 5px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.user-menu-trigger:hover {
+  background: #f5f5f5;
+  border-color: #e8e8e8;
+}
+
+.user-menu-info {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.user-menu-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #262626;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 130px;
+}
+
+.user-menu-role {
+  font-size: 11px;
+  color: #8c8c8c;
+  font-weight: 500;
+}
+
+/* ===== Content ===== */
+.main-content {
+  background: var(--bg-primary, #f5f6fa) !important;
+  min-height: calc(100vh - 60px);
+  padding: 24px 28px !important;
+}
+
+.content-wrapper {
+  max-width: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+/* ===== Tooltip for collapsed menu items ===== */
+.ant-menu-inline-collapsed-tooltip .ant-tooltip-inner {
+  background: #1a1a2e;
+  font-size: 13px;
+}
+
+/* ===== Override Ant Design defaults ===== */
+.ant-layout {
+  background: transparent;
+}
+
+.ant-layout-header {
+  padding: 0 !important;
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 768px) {
+  .main-sider {
+    position: fixed !important;
+    left: 0 !important;
+    z-index: 300 !important;
+  }
+  .main-right {
+    margin-left: 64px;
+  }
+  .user-menu-info {
+    display: none;
+  }
+  .main-content {
+    padding: 16px !important;
+  }
+}
+
+/* ===== RTL Support ===== */
+[dir='rtl'] .main-sider {
+  left: auto;
+  right: 0;
+  box-shadow: -3px 0 18px rgba(0, 0, 0, 0.25);
+}
+
+/* margin handled via inline style in MainLayout.tsx */
+
+[dir='rtl'] .header-right {
+  flex-direction: row-reverse;
+}
+
+[dir='rtl'] .user-menu-trigger {
+  flex-direction: row-reverse;
+}

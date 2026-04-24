@@ -1,0 +1,609 @@
+// EPM - Enterprise Project Management System
+// Complete Prisma Schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// 1. USER & AUTHENTICATION
+// ============================================
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  firstName String
+  lastName  String
+  avatar    String?
+  role      UserRole @default(MEMBER)
+  status    UserStatus @default(ACTIVE)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  projectsOwned     Project[]       @relation("ProjectManager")
+  projectMembers    ProjectMember[]
+  tasksCreated      Task[]          @relation("TaskCreator")
+  tasksAssigned     Task[]          @relation("TaskAssignee")
+  worklogs          Worklog[]
+  raidItems         RAIDItem[]      @relation("RAIDOwner")
+  raidMitigations   RAIDItem[]      @relation("RAIDMitigationOwner")
+  comments          Comment[]
+  rateCards         RateCard[]
+  reportsCreated    Report[]        @relation("ReportCreator")
+  
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN
+  PM              // Project Manager
+  TEAM_LEAD
+  MEMBER
+  VIEWER
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+// ============================================
+// 2. PROJECTS
+// ============================================
+
+model Project {
+  id          String   @id @default(uuid())
+  name        String
+  code        String   @unique
+  description String?
+  client      String?
+  status      ProjectStatus @default(PLANNING)
+  
+  // Account Linkage (Post-Sales tracking)
+  accountId   String?
+  account     Account? @relation("AccountProjects", fields: [accountId], references: [id])
+  
+  startDate   DateTime
+  endDate     DateTime
+  
+  // Financial
+  budget      Float?
+  price       Float
+  currency    String   @default("USD")
+  
+  progress    Float    @default(0)  // 0-100%
+  
+  managerId   String
+  manager     User     @relation("ProjectManager", fields: [managerId], references: [id])
+  
+  settings    Json?    // { hoursPerDay: 8, workDays: [0,1,2,3,4], costCalculation: "assignee" }
+  
+  pptTemplateUrl String?  // Custom PowerPoint template file path
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  members     ProjectMember[]
+  phases      Phase[]
+  tasks       Task[]
+  worklogs    Worklog[]
+  raidItems   RAIDItem[]
+  reports     Report[]
+  products    ProjectProduct[]  // Products sold in this project
+  
+  @@map("projects")
+}
+
+enum ProjectStatus {
+  PLANNING
+  IN_PROGRESS
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+model ProjectMember {
+  id           String   @id @default(uuid())
+  projectId    String
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  
+  role         String   // "Developer", "Designer", "QA", etc.
+  allocation   Float    @default(100)  // % of time allocated
+  
+  joinedAt     DateTime @default(now())
+  leftAt       DateTime?
+  
+  @@unique([projectId, userId])
+  @@map("project_members")
+}
+
+// ============================================
+// 3. WORK BREAKDOWN STRUCTURE (WBS)
+// ============================================
+
+model Phase {
+  id          String   @id @default(uuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  name        String
+  description String?
+  order       Int
+  
+  startDate   DateTime
+  endDate     DateTime
+  
+  status      PhaseStatus @default(NOT_STARTED)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  tasks       Task[]
+  
+  @@map("phases")
+}
+
+enum PhaseStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model Task {
+  id          String   @id @default(uuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  phaseId     String?
+  phase       Phase?   @relation(fields: [phaseId], references: [id], onDelete: SetNull)
+  
+  parentId    String?
+  parent      Task?    @relation("TaskSubtasks", fields: [parentId], references: [id], onDelete: Cascade)
+  subtasks    Task[]   @relation("TaskSubtasks")
+  
+  name        String
+  description String?
+  
+  startDate   DateTime
+  endDate     DateTime
+  duration    Float    // days
+  
+  plannedHours Float?
+  actualHours  Float   @default(0)
+  
+  priority    TaskPriority @default(MEDIUM)
+  status      TaskStatus   @default(NOT_STARTED)
+  
+  progress    Float   @default(0)  // 0-100%
+  
+  createdById String
+  createdBy   User    @relation("TaskCreator", fields: [createdById], references: [id])
+  
+  assignedToId String?
+  assignedTo   User?   @relation("TaskAssignee", fields: [assignedToId], references: [id])
+  
+  order       Int     @default(0)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  dependencies TaskDependency[] @relation("DependentTask")
+  dependents   TaskDependency[] @relation("PredecessorTask")
+  worklogs     Worklog[]
+  comments     Comment[]
+  
+  @@map("tasks")
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum TaskStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  BLOCKED
+  COMPLETED
+  CANCELLED
+}
+
+model TaskDependency {
+  id              String   @id @default(uuid())
+  
+  taskId          String
+  task            Task     @relation("DependentTask", fields: [taskId], references: [id], onDelete: Cascade)
+  
+  dependsOnId     String
+  dependsOn       Task     @relation("PredecessorTask", fields: [dependsOnId], references: [id], onDelete: Cascade)
+  
+  type            DependencyType @default(FS)
+  
+  lag             Int      @default(0)  // days
+  
+  createdAt       DateTime @default(now())
+  
+  @@unique([taskId, dependsOnId])
+  @@map("task_dependencies")
+}
+
+enum DependencyType {
+  FS  // Finish to Start
+  SS  // Start to Start
+  FF  // Finish to Finish
+  SF  // Start to Finish
+}
+
+// ============================================
+// 4. COST MANAGEMENT
+// ============================================
+
+model RateCard {
+  id          String   @id @default(uuid())
+  
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id])
+  
+  role        String?  // If not user-specific, apply to role
+  
+  costRate    Float    // Cost per hour
+  billRate    Float?   // Billing rate (optional)
+  
+  currency    String   @default("USD")
+  
+  effectiveFrom DateTime
+  effectiveTo   DateTime?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("rate_cards")
+}
+
+// ============================================
+// 5. DAILY TRACKING
+// ============================================
+
+model Worklog {
+  id          String   @id @default(uuid())
+  
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  taskId      String?
+  task        Task?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  
+  date        DateTime
+  hours       Float
+  
+  description String?
+  
+  whatDone    String?  // What was accomplished
+  whatNext    String?  // What's planned next
+  blockers    String?  // Any blockers/issues
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("worklogs")
+}
+
+// ============================================
+// 6. RAID LOG
+// ============================================
+
+model RAIDItem {
+  id          String   @id @default(uuid())
+  
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  type        RAIDType
+  
+  title       String
+  description String
+  
+  // For Risks
+  impact           ImpactLevel?
+  impactDescription String?      // Detailed impact description
+  probability      ProbabilityLevel?
+  riskScore        Float?        // impact * probability
+  
+  // Common fields
+  status      RAIDStatus @default(OPEN)
+  priority    TaskPriority @default(MEDIUM)
+  
+  ownerId     String
+  owner       User     @relation("RAIDOwner", fields: [ownerId], references: [id])
+  
+  mitigation        String?  // Mitigation/Response plan
+  mitigationOwnerId String?  // Owner responsible for mitigation execution
+  mitigationOwner   User?    @relation("RAIDMitigationOwner", fields: [mitigationOwnerId], references: [id])
+  
+  comments    String?  // History comments
+  
+  identifiedDate     DateTime  @default(now())
+  targetDate         DateTime? // Closure due date
+  revisedTargetDate  DateTime? // Revised closure due date
+  closedDate         DateTime? // Actual closure date
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("raid_items")
+}
+
+enum RAIDType {
+  RISK
+  ASSUMPTION
+  ISSUE
+  DEPENDENCY
+}
+
+enum ImpactLevel {
+  LOW         // 1
+  MEDIUM      // 2
+  HIGH        // 3
+  VERY_HIGH   // 4
+  CRITICAL    // 5
+}
+
+enum ProbabilityLevel {
+  VERY_LOW    // 1
+  LOW         // 2
+  MEDIUM      // 3
+  HIGH        // 4
+  VERY_HIGH   // 5
+}
+
+enum RAIDStatus {
+  OPEN
+  IN_PROGRESS
+  MITIGATED
+  CLOSED
+}
+
+// ============================================
+// 7. REPORTS
+// ============================================
+
+model Report {
+  id          String   @id @default(uuid())
+  
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  type        ReportType
+  period      String   // "2024-W01", "2024-01", etc.
+  
+  title       String
+  content     Json     // Structured report data
+  
+  generatedById String
+  generatedBy   User   @relation("ReportCreator", fields: [generatedById], references: [id])
+  
+  createdAt   DateTime @default(now())
+  
+  @@map("reports")
+}
+
+enum ReportType {
+  WEEKLY
+  MONTHLY
+  CUSTOM
+  ANNUAL_REVIEW  // Annual Account Review
+}
+
+// ============================================
+// 8. ACCOUNT MANAGEMENT (POST-SALES)
+// ============================================
+
+model Account {
+  id          String   @id @default(uuid())
+  
+  // Account Info
+  name        String   // Client/Account name
+  code        String   @unique
+  industry    String?
+  size        String?  // "Small", "Medium", "Large", "Enterprise"
+  
+  // Contact Info
+  primaryContact      String?
+  primaryContactEmail String?
+  primaryContactPhone String?
+  
+  // Account Health
+  status              AccountStatus @default(ACTIVE)
+  healthScore         Float?       // 0-100 (based on engagement, satisfaction)
+  renewalProbability  Float?       // 0-100% chance of renewal
+  
+  // Financial
+  annualValue         Float?       // Annual recurring revenue
+  lifetimeValue       Float?       // Total revenue from this account
+  
+  // Renewal Tracking
+  contractStartDate   DateTime?
+  contractEndDate     DateTime?
+  nextReviewDate      DateTime?
+  
+  // Notes
+  notes               String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  projects        Project[]       @relation("AccountProjects")
+  reviews         AccountReview[]
+  
+  @@map("accounts")
+}
+
+enum AccountStatus {
+  ACTIVE
+  AT_RISK      // Risk of churn
+  CHURNED      // Lost client
+  DORMANT      // No recent activity
+}
+
+model AccountReview {
+  id          String   @id @default(uuid())
+  
+  accountId   String
+  account     Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  
+  // Review Period
+  reviewYear  Int      // 2026
+  reviewQuarter Int?   // Q1=1, Q2=2, Q3=3, Q4=4 (optional)
+  
+  // Sales Summary
+  totalProjects       Int      // Number of projects this period
+  totalRevenue        Float    // Total sold this period
+  projectsSummary     Json     // [{name, value, date}, ...]
+  
+  // Year-over-Year Comparison
+  previousYearRevenue Float?
+  growthPercentage    Float?   // % growth vs previous year
+  
+  // Future Opportunities
+  renewalLikelihood   Float?   // 0-100%
+  recommendedAction   String?  // "Maintain", "Retention effort"
+  
+  // Report Content
+  executiveSummary    String?
+  keyAchievements     Json?    // [{achievement, date}, ...]
+  challenges          Json?    // [{challenge, resolution}, ...]
+  nextYearPlan        String?
+  
+  // Metadata
+  reviewDate      DateTime @default(now())
+  reviewedBy      String?  // Reviewer name/role
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@unique([accountId, reviewYear, reviewQuarter])
+  @@map("account_reviews")
+}
+
+// ============================================
+// 9. COMMENTS & ATTACHMENTS
+// ============================================
+
+model Comment {
+  id          String   @id @default(uuid())
+  
+  taskId      String?
+  task        Task?    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  
+  content     String
+  
+  authorId    String
+  author      User     @relation(fields: [authorId], references: [id])
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("comments")
+}
+
+// ============================================
+// 10. PRODUCTS & INVENTORY
+// ============================================
+
+model Product {
+  id          String   @id @default(uuid())
+  
+  code        String   @unique      // Product SKU/Code
+  name        String                // Product name
+  nameAr      String?               // Arabic name
+  description String?               // Product description
+  category    String?               // Product category (Software, Hardware, Service, etc.)
+  unit        String   @default("Unit") // Unit of measure (Unit, License, Hour, etc.)
+  
+  unitPrice   Float    @default(0)  // Default unit price
+  cost        Float?                // Unit cost (for margin calculation)
+  
+  isActive    Boolean  @default(true)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  projectProducts ProjectProduct[]
+  
+  @@map("products")
+}
+
+model ProjectProduct {
+  id          String   @id @default(uuid())
+  
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id])
+  
+  quantity    Float    @default(1)   // Quantity sold/used
+  unitPrice   Float                  // Price at time of sale (can differ from product default)
+  discount    Float    @default(0)   // Discount percentage
+  total       Float                  // Calculated: (quantity * unitPrice) * (1 - discount/100)
+  
+  notes       String?                // Additional notes
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@unique([projectId, productId])
+  @@map("project_products")
+}
+
+// ============================================
+// SYSTEM SETTINGS & CONFIGURATIONS
+// ============================================
+
+model SystemSetting {
+  id          String   @id @default(uuid())
+  
+  category    String   // e.g., "roles", "project_status", "task_priority", "task_status", etc.
+  key         String   // The value stored (e.g., "DEVELOPER", "HIGH", "IN_PROGRESS")
+  
+  labelEn     String   // English label
+  labelAr     String   // Arabic label
+  
+  color       String?  // Optional color for tags/badges (e.g., "blue", "#1890ff")
+  icon        String?  // Optional icon name
+  
+  order       Int      @default(0)  // Display order
+  isActive    Boolean  @default(true)
+  isSystem    Boolean  @default(false) // System settings cannot be deleted
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@unique([category, key])
+  @@map("system_settings")
+}
+

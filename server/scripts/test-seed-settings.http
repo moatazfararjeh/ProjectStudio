@@ -1,0 +1,21 @@
+### Login as Admin
+POST http://localhost:5000/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@example.com",
+  "password": "admin123"
+}
+
+### Seed Default Settings
+POST http://localhost:5000/api/settings/seed
+Content-Type: application/json
+Authorization: Bearer YOUR_TOKEN_HERE
+
+### Get All Settings
+GET http://localhost:5000/api/settings
+Authorization: Bearer YOUR_TOKEN_HERE
+
+### Get Settings by Category
+GET http://localhost:5000/api/settings/category/project_member_role
+Authorization: Bearer YOUR_TOKEN_HERE
