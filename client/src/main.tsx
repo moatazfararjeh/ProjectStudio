@@ -2,7 +2,6 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { ConfigProvider } from 'antd';
 import arEG from 'antd/locale/ar_EG';
 import enUS from 'antd/locale/en_US';
@@ -38,11 +37,11 @@ function Root() {
             direction={language === 'ar' ? 'rtl' : 'ltr'}
             theme={{
               token: {
-                colorPrimary: '#667eea',
+                colorPrimary: '#951919',
                 colorSuccess: '#52c41a',
                 colorWarning: '#faad14',
                 colorError: '#ff4d4f',
-                colorInfo: '#1890ff',
+                colorInfo: '#951919',
                 borderRadius: 12,
                 borderRadiusLG: 16,
                 borderRadiusSM: 8,
@@ -82,7 +81,7 @@ function Root() {
                 },
                 Table: {
                   borderRadiusLG: 16,
-                  headerBg: 'rgba(102, 126, 234, 0.1)',
+                  headerBg: 'rgba(149, 25, 25, 0.08)',
                 },
                 Modal: {
                   borderRadiusLG: 20,
@@ -96,7 +95,6 @@ function Root() {
             <App />
           </ConfigProvider>
         </BrowserRouter>
-        <ReactQueryDevtools initialIsOpen={false} />
       </QueryClientProvider>
     </StrictMode>
   );

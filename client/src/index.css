@@ -1,7 +1,7 @@
 :root {
-  /* Modern Color Palette */
-  --primary-color: #1890ff;
-  --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  /* Netways Brand Palette */
+  --primary-color: #951919;
+  --primary-gradient: linear-gradient(135deg, #951919 0%, #7A1414 100%);
   --success-color: #52c41a;
   --warning-color: #faad14;
   --error-color: #ff4d4f;

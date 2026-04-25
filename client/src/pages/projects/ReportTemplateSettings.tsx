@@ -62,9 +62,9 @@ const DEFAULT_TEMPLATE = {
   workDays: [0,1,2,3,4],
   hoursPerDay: 8,
   colors: {
-    primary: '0B4F6C',
-    secondary: '1A7FA1',
-    accent: '2EADD3',
+    primary: '951919',
+    secondary: '7A1414',
+    accent: 'C44040',
     success: '16A34A',
     warning: 'F59E0B',
     danger: 'DC2626',
@@ -377,7 +377,7 @@ export default function ReportTemplateSettings({ project }: ReportTemplateSettin
       {/* Company Identity */}
       <div style={{ marginBottom: 24 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-          <div style={{ width: 4, height: 20, background: '#0B4F6C', borderRadius: 2 }} />
+          <div style={{ width: 4, height: 20, background: '#951919', borderRadius: 2 }} />
           <Text strong style={{ fontSize: 14 }}>هوية الشركة / Company Identity</Text>
         </div>
         <Row gutter={16}>
@@ -399,7 +399,7 @@ export default function ReportTemplateSettings({ project }: ReportTemplateSettin
       {/* Logos */}
       <div style={{ marginBottom: 24 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-          <div style={{ width: 4, height: 20, background: '#0B4F6C', borderRadius: 2 }} />
+          <div style={{ width: 4, height: 20, background: '#951919', borderRadius: 2 }} />
           <Text strong style={{ fontSize: 14 }}>الشعارات / Logos</Text>
         </div>
         <Row gutter={16}>
@@ -476,7 +476,7 @@ export default function ReportTemplateSettings({ project }: ReportTemplateSettin
       {/* Language & Display */}
       <div style={{ marginBottom: 24 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-          <div style={{ width: 4, height: 20, background: '#0B4F6C', borderRadius: 2 }} />
+          <div style={{ width: 4, height: 20, background: '#951919', borderRadius: 2 }} />
           <Text strong style={{ fontSize: 14 }}>اللغة والعرض / Language & Display</Text>
         </div>
         <Form.Item label="Report Language / لغة التقرير" name="language">
@@ -598,7 +598,7 @@ export default function ReportTemplateSettings({ project }: ReportTemplateSettin
               size="small"
               style={{
                 borderRadius: 8,
-                borderLeft: `4px solid ${isEnabled ? `#${currentColors.primary || '0B4F6C'}` : '#d9d9d9'}`,
+                borderLeft: `4px solid ${isEnabled ? `#${currentColors.primary || '951919'}` : '#d9d9d9'}`,
                 opacity: isEnabled ? 1 : 0.55,
                 transition: 'all 0.2s',
                 background: isEnabled ? '#fff' : '#fafafa',
@@ -610,7 +610,7 @@ export default function ReportTemplateSettings({ project }: ReportTemplateSettin
                   <Space align="start">
                     <div style={{
                       width: 28, height: 28, borderRadius: 6, display: 'flex', alignItems: 'center',
-                      justifyContent: 'center', background: isEnabled ? `#${currentColors.primary || '0B4F6C'}` : '#e8e8e8',
+                      justifyContent: 'center', background: isEnabled ? `#${currentColors.primary || '951919'}` : '#e8e8e8',
                       color: isEnabled ? '#fff' : '#aaa', fontWeight: 700, fontSize: 12, flexShrink: 0,
                     }}>
                       {idx + 1}
@@ -688,7 +688,7 @@ export default function ReportTemplateSettings({ project }: ReportTemplateSettin
       {/* Master layout backgrounds only */}
       <div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-          <div style={{ width: 4, height: 20, background: '#1A7FA1', borderRadius: 2 }} />
+          <div style={{ width: 4, height: 20, background: '#951919', borderRadius: 2 }} />
           <Text strong style={{ fontSize: 14 }}>خلفيات التخطيطات الرئيسية / Master Layout Backgrounds</Text>
         </div>
         <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 12 }}>
@@ -702,7 +702,7 @@ export default function ReportTemplateSettings({ project }: ReportTemplateSettin
               <Col xs={12} sm={8} md={6} key={lt}>
                 <Card
                   size="small"
-                  style={{ borderRadius: 8, textAlign: 'center', borderTop: `3px solid var(--ant-color-primary, #0B4F6C)` }}
+                  style={{ borderRadius: 8, textAlign: 'center', borderTop: `3px solid var(--ant-color-primary, #951919)` }}
                   styles={{ body: { padding: '10px 8px' } }}
                 >
                   <Tag color={MASTER_LAYOUT_COLORS[lt]} style={{ fontSize: 10, marginBottom: 6 }}>{label}</Tag>
@@ -756,7 +756,7 @@ export default function ReportTemplateSettings({ project }: ReportTemplateSettin
     <div>
       {/* Header */}
       <div style={{
-        background: 'linear-gradient(135deg, #0B4F6C 0%, #1A7FA1 100%)',
+        background: 'linear-gradient(135deg, #951919 0%, #7A1414 100%)',
         borderRadius: 12,
         padding: '20px 24px',
         marginBottom: 20,
@@ -801,7 +801,7 @@ export default function ReportTemplateSettings({ project }: ReportTemplateSettin
             icon={<SaveOutlined />}
             onClick={handleSave}
             loading={saveMutation.isPending}
-            style={{ background: '#2EADD3', border: 'none', fontWeight: 600 }}
+            style={{ background: '#951919', border: 'none', fontWeight: 600 }}
           >
             حفظ الإعدادات
           </Button>
@@ -830,7 +830,7 @@ export default function ReportTemplateSettings({ project }: ReportTemplateSettin
                 <Space>
                   <AppstoreOutlined />
                   <span>الشرائح</span>
-                  <Badge count={enabledCount} style={{ background: '#0B4F6C' }} />
+                  <Badge count={enabledCount} style={{ background: '#951919' }} />
                 </Space>
               ),
               children: <div style={{ paddingTop: 16 }}>{tabSlides}</div>,

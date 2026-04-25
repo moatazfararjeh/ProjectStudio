@@ -158,9 +158,24 @@ export default function MainLayout() {
         className="main-sider"
         trigger={null}
       >
-        {/* Logo area */}
-        {isProjectPage ? (
-          <div className="sider-logo sider-project-header">
+        {/* Logo area — always visible */}
+        <div className="sider-logo" onClick={() => navigate('/')}>
+          {collapsed ? (
+            <div className="sider-logo-icon">
+              <AppstoreOutlined />
+            </div>
+          ) : (
+            <img
+              src="https://netways.com/img/logoblack.png"
+              alt="Netways"
+              className="sider-logo-img"
+            />
+          )}
+        </div>
+
+        {/* Project context header — shown only inside a project */}
+        {isProjectPage && (
+          <div className="sider-project-header">
             <Button
               type="text"
               icon={<ArrowLeftOutlined />}
@@ -172,15 +187,6 @@ export default function MainLayout() {
               <span className="sider-project-name">
                 {projectData?.name ?? 'Project'}
               </span>
-            )}
-          </div>
-        ) : (
-          <div className="sider-logo" onClick={() => navigate('/')}>
-            <div className="sider-logo-icon">
-              <AppstoreOutlined />
-            </div>
-            {!collapsed && (
-              <span className="sider-logo-title">Project Management Studio</span>
             )}
           </div>
         )}

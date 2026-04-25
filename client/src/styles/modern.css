@@ -20,7 +20,7 @@
   font-weight: 700;
   color: var(--text-primary);
   margin: 0;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #951919 0%, #C44040 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -52,7 +52,7 @@
   left: 0;
   right: 0;
   height: 4px;
-  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(90deg, #951919 0%, #C44040 100%);
   opacity: 0;
   transition: opacity 0.3s;
 }
@@ -60,7 +60,7 @@
 .modern-card:hover {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
   transform: translateY(-4px);
-  border-color: rgba(102, 126, 234, 0.3);
+  border-color: rgba(149, 25, 25, 0.2);
 }
 
 .modern-card:hover::before {
@@ -83,11 +83,11 @@
 
 /* Stats Cards */
 .stat-card {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #951919 0%, #7A1414 100%);
   border-radius: 16px;
   padding: 24px;
   color: white;
-  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 4px 16px rgba(149, 25, 25, 0.35);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;
@@ -106,7 +106,7 @@
 
 .stat-card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 8px 32px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 8px 32px rgba(149, 25, 25, 0.45);
 }
 
 .stat-card:hover::before {
@@ -133,28 +133,28 @@
 
 /* Action Buttons */
 .modern-btn-primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #951919 0%, #7A1414 100%);
   border: none;
   border-radius: 12px;
   color: white;
   font-weight: 600;
   padding: 10px 24px;
   height: auto;
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 4px 12px rgba(149, 25, 25, 0.35);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .modern-btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 6px 20px rgba(149, 25, 25, 0.45);
   color: white !important;
 }
 
 .modern-btn-secondary {
   background: white;
-  border: 2px solid #667eea;
+  border: 2px solid #951919;
   border-radius: 12px;
-  color: #667eea;
+  color: #951919;
   font-weight: 600;
   padding: 10px 24px;
   height: auto;
@@ -162,10 +162,10 @@
 }
 
 .modern-btn-secondary:hover {
-  background: #667eea;
+  background: #951919;
   color: white !important;
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 4px 12px rgba(149, 25, 25, 0.35);
 }
 
 /* Tables */
@@ -176,10 +176,10 @@
 }
 
 .modern-table .ant-table-thead > tr > th {
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+  background: linear-gradient(135deg, rgba(149, 25, 25, 0.07) 0%, rgba(122, 20, 20, 0.05) 100%);
   font-weight: 600;
   color: var(--text-primary);
-  border-bottom: 2px solid rgba(102, 126, 234, 0.3);
+  border-bottom: 2px solid rgba(149, 25, 25, 0.2);
   padding: 16px;
 }
 
@@ -188,7 +188,7 @@
 }
 
 .modern-table .ant-table-tbody > tr:hover {
-  background: rgba(102, 126, 234, 0.05);
+  background: rgba(149, 25, 25, 0.04);
   transform: scale(1.01);
 }
 
@@ -236,8 +236,8 @@
 .modern-form .ant-input-number:focus,
 .modern-form .ant-picker:focus,
 .modern-form .ant-select-focused .ant-select-selector {
-  border-color: #667eea;
-  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+  border-color: #951919;
+  box-shadow: 0 0 0 4px rgba(149, 25, 25, 0.1);
 }
 
 /* Modals */
@@ -248,8 +248,8 @@
 }
 
 .modern-modal .ant-modal-header {
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
-  border-bottom: 2px solid rgba(102, 126, 234, 0.2);
+  background: linear-gradient(135deg, rgba(149, 25, 25, 0.07) 0%, rgba(122, 20, 20, 0.05) 100%);
+  border-bottom: 2px solid rgba(149, 25, 25, 0.15);
   padding: 20px 24px;
 }
 
@@ -311,12 +311,12 @@
   transform: translateX(-50%);
   width: 100px;
   height: 2px;
-  background: linear-gradient(90deg, transparent, #667eea, transparent);
+  background: linear-gradient(90deg, transparent, #951919, transparent);
 }
 
 /* Progress */
 .modern-progress .ant-progress-bg {
-  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(90deg, #951919 0%, #C44040 100%);
 }
 
 /* Breadcrumbs */
@@ -331,7 +331,7 @@
 }
 
 .modern-breadcrumb .ant-breadcrumb-link:hover {
-  color: #667eea;
+  color: #951919;
 }
 
 /* Tabs */
@@ -346,17 +346,17 @@
 }
 
 .modern-tabs .ant-tabs-tab:hover {
-  color: #667eea;
+  color: #951919;
 }
 
 .modern-tabs .ant-tabs-tab-active {
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+  background: linear-gradient(135deg, rgba(149, 25, 25, 0.08) 0%, rgba(122, 20, 20, 0.05) 100%);
   border-radius: 12px 12px 0 0;
 }
 
 .modern-tabs .ant-tabs-ink-bar {
   height: 3px;
-  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(90deg, #951919 0%, #C44040 100%);
 }
 
 /* Animations */
@@ -402,13 +402,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #667eea !important;
-  background: rgba(102, 126, 234, 0.08) !important;
-  border: 1px solid rgba(102, 126, 234, 0.15) !important;
+  color: #951919 !important;
+  background: rgba(149, 25, 25, 0.07) !important;
+  border: 1px solid rgba(149, 25, 25, 0.15) !important;
   transition: all 0.2s ease;
 }
 .project-back-btn:hover {
-  background: rgba(102, 126, 234, 0.15) !important;
+  background: rgba(149, 25, 25, 0.14) !important;
   transform: translateX(-2px);
 }
 
@@ -452,13 +452,13 @@
 }
 
 .project-nav-menu .ant-menu-item:hover {
-  background: rgba(102, 126, 234, 0.06) !important;
-  color: #667eea;
+  background: rgba(149, 25, 25, 0.05) !important;
+  color: #951919;
 }
 
 .project-nav-menu .ant-menu-item-selected {
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.12) 0%, rgba(118, 75, 162, 0.08) 100%) !important;
-  color: #667eea !important;
+  background: linear-gradient(135deg, rgba(149, 25, 25, 0.1) 0%, rgba(122, 20, 20, 0.07) 100%) !important;
+  color: #951919 !important;
   font-weight: 600;
   position: relative;
 }
@@ -471,7 +471,7 @@
   bottom: 6px;
   width: 3px;
   border-radius: 0 3px 3px 0;
-  background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(180deg, #951919 0%, #C44040 100%);
 }
 
 .project-nav-menu .ant-menu-item .anticon {

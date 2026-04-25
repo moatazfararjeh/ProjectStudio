@@ -11,7 +11,7 @@ export default function AuthLayout() {
         <div className="auth-container">
           <div className="auth-header">
             <h1 className="auth-logo">EPM</h1>
-            <p className="auth-subtitle">Project Management Studio</p>
+            <p className="auth-subtitle">PMS</p>
           </div>
           <Outlet />
         </div>
