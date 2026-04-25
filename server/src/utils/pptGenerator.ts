@@ -31,6 +31,8 @@ function buildTheme(cfg: ReportTemplateConfig) {
 
 // Keep a module-level reference so helpers can use it (set before slide generation)
 let THEME = buildTheme(DEFAULT_REPORT_TEMPLATE);
+// IS_RTL: true for Arabic/bilingual, false for English — set per-generation
+let IS_RTL = true;
 
 // ============================================
 // HELPER: Add slide header title text
@@ -40,6 +42,8 @@ function addSlideHeader(slide: any, title: string) {
   slide.addText(title, {
     x: 1.0, y: 0.1, w: 11.2, h: 0.6,
     fontSize: 22, bold: true, color: THEME.white,
+    align: IS_RTL ? 'right' : 'left',
+    rtlMode: IS_RTL,
   });
 }
 
@@ -98,11 +102,11 @@ function defineMasterLayouts(pptx: PptxGenJS, cfg: ReportTemplateConfig) {
   // ── COVER: full primary color (or custom bg), accent bars top/bottom, large logos ──
   pptx.defineSlideMaster({
     title: 'MASTER_COVER',
-    bkgd: { color: bkgdColor('cover', THEME.primary) },
+    bkgd: { color: THEME.primary },
     objects: [
+      // Full-slide primary color fill to eliminate any white edges
+      { rect: { x: 0, y: 0, w: '100%', h: '100%', fill: { color: THEME.primary } } },
       ...bgImageObjs('cover'),
-      { rect: { x: 0, y: 0,    w: '100%', h: 0.15, fill: { color: THEME.accent } } },
-      { rect: { x: 0, y: 7.35, w: '100%', h: 0.15, fill: { color: THEME.accent } } },
       ...logoCover(),
     ],
   });
@@ -258,6 +262,14 @@ export async function generateWeeklyReportPPT(projectId: string): Promise<Buffer
 
   // Apply theme from config
   THEME = buildTheme(cfg);
+  IS_RTL = cfg.language !== 'en';
+
+  // Translation helper: returns text based on language setting
+  const t = (ar: string, en: string, bilingual?: string): string => {
+    if (cfg.language === 'en') return en;
+    if (cfg.language === 'ar') return ar;
+    return bilingual !== undefined ? bilingual : `${ar} - ${en}`;
+  };
 
   const pptx = new PptxGenJS();
   pptx.author = 'EPM - Enterprise Project Management';
@@ -284,19 +296,9 @@ export async function generateWeeklyReportPPT(projectId: string): Promise<Buffer
     return map[layoutKey ?? ''] ?? 'MASTER_TITLE_AND_CONTENT';
   };
 
-  // Add per-slide background image on top of the master background
-  const addSlideBg = (slide: any, slideKey: string) => {
-    const url = (cfg as any).slideImages?.[slideKey];
-    if (url) {
-      const p = path.join(__dirname, '../../public', url);
-      if (fs.existsSync(p)) {
-        const ext = path.extname(p).toLowerCase().replace('.', '');
-        const mime = ext === 'jpg' || ext === 'jpeg' ? 'jpeg' : 'png';
-        const b64 = fs.readFileSync(p).toString('base64');
-        slide.addImage({ x: 0, y: 0, w: 13.33, h: 7.5, data: `image/${mime};base64,${b64}` });
-      }
-    }
-  };
+  // Per-slide background images disabled — master layout backgrounds are used instead
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const addSlideBg = (_slide: any, _slideKey: string) => { /* no-op */ };
 
   // ————— Date ranges —————
   const today = new Date();
@@ -323,7 +325,6 @@ export async function generateWeeklyReportPPT(projectId: string): Promise<Buffer
     where: { id: projectId },
     include: {
       manager: { select: { firstName: true, lastName: true } },
-      phases: { orderBy: { order: 'asc' } },
       members: { include: { user: { select: { firstName: true, lastName: true } } } },
     },
   });
@@ -336,17 +337,16 @@ export async function generateWeeklyReportPPT(projectId: string): Promise<Buffer
     where: { projectId },
     include: {
       assignedTo: { select: { firstName: true, lastName: true } },
-      phase: { select: { name: true } },
     },
     orderBy: { startDate: 'asc' },
-  });
+  }) as any[];
 
-  // Milestones = all summary tasks (tasks that have children) at any WBS level
-  // Excludes leaf-level tasks (the actual work items with no subtasks)
+  // Milestones = mid-level summary tasks (have children AND have a parent themselves)
+  // Excludes top-level phase containers (parentId === null) and leaf-level work tasks
   const parentTaskIds = new Set(
     allTasks.filter(t => t.parentId).map(t => t.parentId!)
   );
-  const milestones = allTasks.filter(t => parentTaskIds.has(t.id));
+  const milestones = allTasks.filter(t => parentTaskIds.has(t.id) && t.parentId !== null);
 
   // Completed tasks this week
   const completedThisWeek = allTasks.filter(
@@ -397,41 +397,25 @@ export async function generateWeeklyReportPPT(projectId: string): Promise<Buffer
     const slide1 = createSlide(masterForSlide('titlePage'));
     addSlideBg(slide1, 'titlePage');
 
-    // Project name
+    // Project name — right panel (RTL) or left panel (LTR)
+    const coverPanelX = IS_RTL ? 7.3 : 0.3;
+    const coverAlign = IS_RTL ? 'right' : 'left';
+    const dateLocale = cfg.language === 'en' ? 'en-US' : 'ar-SA';
     slide1.addText(project.name, {
-      x: 0.8, y: 2.0, w: 11.7, h: 1.5,
-      fontSize: 44, bold: true, color: THEME.white, align: 'center',
-      fontFace: 'Segoe UI',
-    });
-
-    // Subtitle: تقرير حالة المشروع
-    slide1.addText('تقرير حالة المشروع', {
-      x: 0.8, y: 3.5, w: 11.7, h: 0.8,
-      fontSize: 28, color: THEME.accent, align: 'center',
-      fontFace: 'Segoe UI',
+      x: coverPanelX, y: 2.8, w: 5.7, h: 1.4,
+      fontSize: 32, bold: true, color: THEME.white, align: coverAlign,
+      fontFace: 'Segoe UI', rtlMode: IS_RTL,
     });
 
     // Report date
     slide1.addText(
-      `تاريخ التقرير: ${today.toLocaleDateString('ar-SA', { year: 'numeric', month: 'long', day: 'numeric' })}`,
+      today.toLocaleDateString(dateLocale, { year: 'numeric', month: 'long', day: 'numeric' }),
       {
-        x: 0.8, y: 4.6, w: 11.7, h: 0.6,
-        fontSize: 18, color: THEME.white, align: 'center',
-        fontFace: 'Segoe UI',
+        x: coverPanelX, y: 4.3, w: 5.7, h: 0.6,
+        fontSize: 20, bold: true, color: THEME.white, align: coverAlign,
+        fontFace: 'Segoe UI', rtlMode: IS_RTL,
       }
     );
-
-    // Manager info
-    if (project.manager) {
-      slide1.addText(
-        `مدير المشروع: ${project.manager.firstName} ${project.manager.lastName}`,
-        {
-          x: 0.8, y: 5.4, w: 11.7, h: 0.5,
-          fontSize: 14, color: THEME.lightText, align: 'center',
-          fontFace: 'Segoe UI',
-        }
-      );
-    }
 
   } // end titlePage
 
@@ -441,46 +425,74 @@ export async function generateWeeklyReportPPT(projectId: string): Promise<Buffer
   if (cfg.slides.agenda) {
     const slide2 = createSlide(masterForSlide('agenda'));
     addSlideBg(slide2, 'agenda');
-    addSlideHeader(slide2, 'جدول الأعمال - Agenda');
+    addSlideHeader(slide2, t('جدول الأعمال', 'Agenda', 'جدول الأعمال - Agenda'));
 
   const agendaItems = [
-    { num: '01', title: 'لوحة البيانات', subtitle: 'Dashboard', icon: '📊' },
-    { num: '02', title: 'ما تم إنجازه هذا الأسبوع', subtitle: 'This Week Achievements', icon: '✅' },
-    { num: '03', title: 'خطة الأسبوع القادم', subtitle: 'Next Week Plan', icon: '📅' },
-    { num: '04', title: 'المعالم الرئيسية', subtitle: 'Key Milestones', icon: '🏁' },
-    { num: '05', title: 'المخاطر والتحديات', subtitle: 'Risks & Challenges', icon: '⚠️' },
+    { num: '01', arTitle: 'ملخص تنفيذي',          enTitle: 'Executive Summary' },
+    { num: '02', arTitle: 'خط سير المشروع والمهام', enTitle: 'Project Progress & Tasks' },
+    { num: '03', arTitle: 'المخاطر / التحديات',    enTitle: 'Risks & Challenges' },
   ];
 
+  const agendaNumX  = IS_RTL ? 10.8 : 1.5;
+  const agendaTxtX  = IS_RTL ? 1.5  : 2.8;
+  const agendaTxtW  = 9.0;
+  const agendaTxtAlign = IS_RTL ? 'right' : 'left';
   let agendaY = 1.8;
   agendaItems.forEach((item) => {
     // Number circle
     slide2.addShape('ellipse' as any, {
-      x: 1.5, y: agendaY - 0.1, w: 0.9, h: 0.9,
+      x: agendaNumX, y: agendaY - 0.1, w: 0.9, h: 0.9,
       fill: { color: THEME.primary },
     });
     slide2.addText(item.num, {
-      x: 1.5, y: agendaY, w: 0.9, h: 0.7,
+      x: agendaNumX, y: agendaY, w: 0.9, h: 0.7,
       fontSize: 22, bold: true, color: THEME.white, align: 'center', valign: 'middle',
     });
 
-    // Title (Arabic RTL)
-    slide2.addText(item.title, {
-      x: 2.8, y: agendaY - 0.05, w: 8, h: 0.5,
+    // Main title
+    slide2.addText(t(item.arTitle, item.enTitle), {
+      x: agendaTxtX, y: agendaY - 0.05, w: agendaTxtW, h: 0.5,
       fontSize: 22, bold: true, color: THEME.dark,
-      fontFace: 'Segoe UI',
+      fontFace: 'Segoe UI', align: agendaTxtAlign, rtlMode: IS_RTL,
     });
 
-    // Subtitle (English)
-    slide2.addText(item.subtitle, {
-      x: 2.8, y: agendaY + 0.45, w: 8, h: 0.35,
-      fontSize: 14, color: THEME.lightText,
-      fontFace: 'Segoe UI',
-    });
+    // English subtitle (bilingual mode only)
+    if (cfg.language === 'bilingual') {
+      slide2.addText(item.enTitle, {
+        x: agendaTxtX, y: agendaY + 0.45, w: agendaTxtW, h: 0.35,
+        fontSize: 14, color: THEME.lightText,
+        fontFace: 'Segoe UI', align: agendaTxtAlign,
+      });
+    }
 
-    agendaY += 1.6;
+    agendaY += 2.0;
   });
 
   } // end agenda
+
+  // ============================================================
+  //  SECTION DIVIDER 01: ملخص تنفيذي
+  // ============================================================
+  if (cfg.slides.executiveSummary) {
+    const secSlide1 = createSlide('MASTER_SECTION_TITLE');
+    secSlide1.addText('01', {
+      x: IS_RTL ? 0.3 : 9.0, y: 3.5, w: 4.0, h: 2.5,
+      fontSize: 120, bold: true, color: THEME.white, align: IS_RTL ? 'left' : 'right', valign: 'bottom',
+      fontFace: 'Segoe UI', transparency: 20,
+    });
+    secSlide1.addText(t('ملخص تنفيذي', 'Executive Summary'), {
+      x: IS_RTL ? 5.5 : 0.3, y: 2.5, w: 7.5, h: 1.2,
+      fontSize: 44, bold: true, color: THEME.white, align: IS_RTL ? 'right' : 'left', valign: 'middle',
+      fontFace: 'Segoe UI', rtlMode: IS_RTL,
+    });
+    if (cfg.language === 'bilingual') {
+      secSlide1.addText('Executive Summary', {
+        x: 5.5, y: 3.7, w: 7.5, h: 0.7,
+        fontSize: 22, color: THEME.accent, align: 'right', valign: 'middle',
+        fontFace: 'Segoe UI',
+      });
+    }
+  }
 
   // ============================================================
   //  SLIDE 3: EXECUTIVE SUMMARY (ملخص تنفيذي)
@@ -488,14 +500,14 @@ export async function generateWeeklyReportPPT(projectId: string): Promise<Buffer
   if (cfg.slides.executiveSummary) {
     const slide3 = createSlide(masterForSlide('executiveSummary'));
     addSlideBg(slide3, 'executiveSummary');
-    addSlideHeader(slide3, 'لوحة البيانات - Dashboard');
+    addSlideHeader(slide3, t('ملخص تنفيذي', 'Executive Summary', 'ملخص تنفيذي - Executive Summary'));
 
   // Progress cards row
   const cards = [
-    { label: 'الإنجاز الفعلي\nActual Progress', value: `${actualProgress.toFixed(1)}%`, color: THEME.success },
-    { label: 'الإنجاز المخطط\nPlanned Progress', value: `${plannedProgress.toFixed(1)}%`, color: THEME.info },
-    { label: 'التباين\nVariance', value: varianceIndicator(plannedProgress, actualProgress), color: varianceColor(plannedProgress, actualProgress) },
-    { label: 'حالة المشروع\nProject Status', value: project.status.replace('_', ' '), color: THEME.secondary },
+    { label: t('الإنجاز الفعلي', 'Actual Progress', 'الإنجاز الفعلي\nActual Progress'), value: `${actualProgress.toFixed(1)}%`, color: THEME.success },
+    { label: t('الإنجاز المخطط', 'Planned Progress', 'الإنجاز المخطط\nPlanned Progress'), value: `${plannedProgress.toFixed(1)}%`, color: THEME.info },
+    { label: t('التباين', 'Variance', 'التباين\nVariance'), value: varianceIndicator(plannedProgress, actualProgress), color: varianceColor(plannedProgress, actualProgress) },
+    { label: t('حالة المشروع', 'Project Status', 'حالة المشروع\nProject Status'), value: project.status.replace('_', ' '), color: THEME.secondary },
   ];
 
   cards.forEach((card, i) => {
@@ -521,10 +533,10 @@ export async function generateWeeklyReportPPT(projectId: string): Promise<Buffer
 
   // Summary statistics row
   const stats2 = [
-    { label: 'إجمالي المهام\nTotal Tasks', value: totalTasks.toString(), color: THEME.primary },
-    { label: 'مكتملة\nCompleted', value: completedCount.toString(), color: THEME.success },
-    { label: 'قيد التنفيذ\nIn Progress', value: inProgressCount.toString(), color: THEME.info },
-    { label: 'متأخرة\nOverdue', value: overdueTasks.toString(), color: THEME.danger },
+    { label: t('إجمالي المهام', 'Total Tasks', 'إجمالي المهام\nTotal Tasks'), value: totalTasks.toString(), color: THEME.primary },
+    { label: t('مكتملة', 'Completed', 'مكتملة\nCompleted'), value: completedCount.toString(), color: THEME.success },
+    { label: t('قيد التنفيذ', 'In Progress', 'قيد التنفيذ\nIn Progress'), value: inProgressCount.toString(), color: THEME.info },
+    { label: t('متأخرة', 'Overdue', 'متأخرة\nOverdue'), value: overdueTasks.toString(), color: THEME.danger },
   ];
 
   stats2.forEach((stat, i) => {
@@ -546,7 +558,7 @@ export async function generateWeeklyReportPPT(projectId: string): Promise<Buffer
   });
 
   // Project timeline bar
-  slide3.addText('مدة المشروع / Project Duration', {
+  slide3.addText(t('مدة المشروع', 'Project Duration', 'مدة المشروع / Project Duration'), {
     x: 0.5, y: 5.2, w: 12, h: 0.3,
     fontSize: 12, bold: true, color: THEME.dark,
   });
@@ -582,50 +594,169 @@ export async function generateWeeklyReportPPT(projectId: string): Promise<Buffer
   } // end executiveSummary
 
   // ============================================================
+  //  MILESTONES after Executive Summary (Section 01)
+  // ============================================================
+  if (cfg.slides.milestones) {
+    const MILESTONES_PER_PAGE = cfg.milestonesPerPage || 10;
+    const milestonePages = Math.max(1, Math.ceil(milestones.length / MILESTONES_PER_PAGE));
+
+    for (let page = 0; page < milestonePages; page++) {
+      const slideM = createSlide(masterForSlide('milestones'));
+      addSlideBg(slideM, 'milestones');
+      const pageLabel = milestonePages > 1 ? ` (${page + 1}/${milestonePages})` : '';
+      addSlideHeader(slideM, `المعالم الرئيسية - Key Milestones${pageLabel}`);
+
+      const milestonesOnPage = milestones.slice(
+        page * MILESTONES_PER_PAGE,
+        (page + 1) * MILESTONES_PER_PAGE
+      );
+
+      if (milestonesOnPage.length === 0 && page === 0) {
+        slideM.addText(t('لا توجد معالم رئيسية', 'No milestones defined', 'لا توجد معالم رئيسية / No milestones defined'), {
+          x: 1, y: 3, w: 11, h: 1,
+          fontSize: 16, color: THEME.lightText, italic: true, align: 'center',
+        });
+      } else {
+        // RTL column order: التباين | الانتهاء الفعلي | الانتهاء المخطط | البدء المخطط | الحالة | المعلم | #
+        const statusColors: Record<string, string> = {
+          COMPLETED: THEME.success, IN_PROGRESS: THEME.info,
+          NOT_STARTED: THEME.lightText, DELAYED: THEME.danger, ON_HOLD: THEME.warning,
+        };
+        const statusLabels: Record<string, string> = IS_RTL ? {
+          COMPLETED: 'تم الانتهاء', IN_PROGRESS: 'قيد التنفيذ',
+          NOT_STARTED: 'لم تبدأ', DELAYED: 'متأخر', ON_HOLD: 'متوقف',
+        } : {
+          COMPLETED: 'Completed', IN_PROGRESS: 'In Progress',
+          NOT_STARTED: 'Not Started', DELAYED: 'Delayed', ON_HOLD: 'On Hold',
+        };
+
+        // RTL: تباين | انتهاء فعلي | انتهاء مخطط | بداية مخطط | حالة | المعلم | #
+        // LTR: # | Milestone | Status | Planned Start | Planned End | Actual End | Variance
+        const msHeaderRow = IS_RTL ? [
+          headerCell(t('التباين (أيام)', 'Variance (Days)')),
+          headerCell(t('الانتهاء الفعلي', 'Actual Finish')),
+          headerCell(t('البدء الفعلي', 'Actual Start')),
+          headerCell(t('الانتهاء الأساسي', 'Baseline Finish')),
+          headerCell(t('البدء الأساسي', 'Baseline Start')),
+          headerCell(t('تاريخ الانتهاء', 'Planned End')),
+          headerCell(t('تاريخ البدء', 'Planned Start')),
+          headerCell(t('الحالة', 'Status')),
+          headerCell(t('المعلم', 'Milestone')),
+          headerCell('#'),
+        ] : [
+          headerCell('#'),
+          headerCell('Milestone'),
+          headerCell('Status'),
+          headerCell('Planned Start'),
+          headerCell('Planned End'),
+          headerCell('Baseline Start'),
+          headerCell('Baseline Finish'),
+          headerCell('Actual Start'),
+          headerCell('Actual Finish'),
+          headerCell('Variance (Days)'),
+        ];
+
+        const msRows: any[][] = [msHeaderRow];
+        milestonesOnPage.forEach((m: any, idx: number) => {
+          const rowFill = idx % 2 === 0 ? {} : { fill: { color: THEME.tableAltRow } };
+          const statusClr = statusColors[m.status] || THEME.text;
+          const plannedEnd = m.endDate ? new Date(m.endDate) : null;
+          const actualEnd = (m.actualFinish ?? m.actualEndDate) ? new Date(m.actualFinish ?? m.actualEndDate) : null;
+          let variance = '-';
+          if (plannedEnd && actualEnd) {
+            const diff = Math.round((actualEnd.getTime() - plannedEnd.getTime()) / (1000 * 60 * 60 * 24));
+            variance = IS_RTL
+              ? (diff > 0 ? `+${diff} يوم` : diff < 0 ? `${diff} يوم` : '0 يوم')
+              : (diff > 0 ? `+${diff}d` : diff < 0 ? `${diff}d` : '0d');
+          }
+          const varCell  = dataCell(variance, { color: variance.startsWith('+') ? THEME.danger : THEME.success, bold: true, ...rowFill });
+          const numCell  = dataCell((page * MILESTONES_PER_PAGE + idx + 1).toString(), rowFill);
+          const nameCell = dataCell(m.name, { align: IS_RTL ? 'right' : 'left', rtlMode: IS_RTL, ...rowFill });
+          const stCell   = dataCell(statusLabels[m.status] || m.status, { color: statusClr, bold: true, ...rowFill });
+          const startCell     = dataCell(fmtDate(m.startDate), rowFill);
+          const endCell       = dataCell(fmtDate(m.endDate), rowFill);
+          const baseStartCell = dataCell(fmtDate(m.baselineStart), rowFill);
+          const baseEndCell   = dataCell(fmtDate(m.baselineFinish), rowFill);
+          const actStartCell  = dataCell(fmtDate(m.actualStart), rowFill);
+          const actEndCell    = dataCell(fmtDate(m.actualFinish ?? m.actualEndDate), rowFill);
+          msRows.push(IS_RTL
+            ? [varCell, actEndCell, actStartCell, baseEndCell, baseStartCell, endCell, startCell, stCell, nameCell, numCell]
+            : [numCell, nameCell, stCell, startCell, endCell, baseStartCell, baseEndCell, actStartCell, actEndCell, varCell]
+          );
+        });
+        slideM.addTable(msRows, {
+          x: 0.15, y: 1.0, w: 13.0,
+          colW: IS_RTL ? [1.1, 1.4, 1.4, 1.4, 1.4, 1.4, 1.4, 1.2, 2.3, 0.5] : [0.4, 2.4, 1.1, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.1],
+          rowH: 0.38,
+          border: { pt: 0.5, color: THEME.tableBorder },
+        });
+      }
+    }
+  } // end milestones (section 01)
+
+  // ============================================================
+  //  SECTION DIVIDER 02: خط سير المشروع والمهام
+  // ============================================================
+  if (cfg.slides.weeklyProgress || (cfg.slides as any).nextWeek) {
+    const secSlide2 = createSlide('MASTER_SECTION_TITLE');
+    secSlide2.addText('02', {
+      x: IS_RTL ? 0.3 : 9.0, y: 3.5, w: 4.0, h: 2.5,
+      fontSize: 120, bold: true, color: THEME.white, align: IS_RTL ? 'left' : 'right', valign: 'bottom',
+      fontFace: 'Segoe UI', transparency: 20,
+    });
+    secSlide2.addText(t('خط سير المشروع والمهام', 'Project Progress & Tasks'), {
+      x: IS_RTL ? 4.0 : 0.3, y: 2.5, w: 9.0, h: 1.2,
+      fontSize: 38, bold: true, color: THEME.white, align: IS_RTL ? 'right' : 'left', valign: 'middle',
+      fontFace: 'Segoe UI', rtlMode: IS_RTL,
+    });
+    if (cfg.language === 'bilingual') {
+      secSlide2.addText('Project Progress & Tasks', {
+        x: 4.0, y: 3.7, w: 9.0, h: 0.7,
+        fontSize: 22, color: THEME.accent, align: 'right', valign: 'middle',
+        fontFace: 'Segoe UI',
+      });
+    }
+  }
+
+  // ============================================================
   //  SLIDE 4: THIS WEEK (ما تم إنجازه هذا الأسبوع)
   // ============================================================
   if (cfg.slides.weeklyProgress) {
     const slide4 = createSlide(masterForSlide('weeklyProgress'));
     addSlideBg(slide4, 'weeklyProgress');
-    addSlideHeader(slide4, 'ما تم إنجازه هذا الأسبوع - This Week Achievements');
+    addSlideHeader(slide4, t('ما تم إنجازه هذا الأسبوع', 'This Week Achievements', 'ما تم إنجازه هذا الأسبوع - This Week Achievements'));
 
   if (completedThisWeek.length === 0) {
-    slide4.addText('لا توجد مهام مكتملة هذا الأسبوع / No tasks completed this week', {
+    slide4.addText(t('لا توجد مهام مكتملة هذا الأسبوع', 'No tasks completed this week', 'لا توجد مهام مكتملة هذا الأسبوع / No tasks completed this week'), {
       x: 0.5, y: 2.5, w: 12, h: 1,
       fontSize: 16, color: THEME.lightText, italic: true, align: 'center',
     });
   } else {
-    // Group completed tasks by phase
-    const byPhase: Record<string, typeof completedThisWeek> = {};
-    completedThisWeek.forEach(t => {
-      const phase = t.phase?.name || 'غير محدد / Unassigned';
-      if (!byPhase[phase]) byPhase[phase] = [];
-      byPhase[phase].push(t);
-    });
-
-    const rows4: any[][] = [
-      [headerCell('#'), headerCell('المهمة / Task'), headerCell('المرحلة / Phase'), headerCell('المسؤول / Assignee'), headerCell('تاريخ الإنجاز / Completed')],
-    ];
+    // RTL: تاريخ الإنجاز | المسؤول | المهمة | #
+    // LTR: # | Task | Assignee | Completion Date
+    const tw4Header = IS_RTL
+      ? [headerCell(t('تاريخ الإنجاز', 'Completion Date')), headerCell(t('المسؤول', 'Assignee')), headerCell(t('المهمة', 'Task')), headerCell('#')]
+      : [headerCell('#'), headerCell('Task'), headerCell('Assignee'), headerCell('Completion Date')];
+    const rows4: any[][] = [tw4Header];
 
     let rowNum4 = 1;
-    Object.entries(byPhase).forEach(([phaseName, phaseTasks]) => {
-      phaseTasks.slice(0, 20).forEach((task) => {
+    completedThisWeek.slice(0, 20).forEach((task) => {
         const assignee = task.assignedTo ? `${task.assignedTo.firstName} ${task.assignedTo.lastName}` : '-';
         const rowFill = rowNum4 % 2 === 0 ? {} : { fill: { color: THEME.tableAltRow } };
-        rows4.push([
-          dataCell(rowNum4.toString(), rowFill),
-          dataCell(task.name, { align: 'left', ...rowFill }),
-          dataCell(phaseName, rowFill),
-          dataCell(assignee, rowFill),
-          dataCell(fmtDate(task.updatedAt), rowFill),
-        ]);
+        const numCell4   = dataCell(rowNum4.toString(), rowFill);
+        const nameCell4  = dataCell(task.name, { align: IS_RTL ? 'right' : 'left', rtlMode: IS_RTL, ...rowFill });
+        const asnCell4   = dataCell(assignee, rowFill);
+        const dateCell4  = dataCell(fmtDate(task.updatedAt), rowFill);
+        rows4.push(IS_RTL
+          ? [dateCell4, asnCell4, nameCell4, numCell4]
+          : [numCell4, nameCell4, asnCell4, dateCell4]
+        );
         rowNum4++;
-      });
     });
 
     slide4.addTable(rows4, {
       x: 0.3, y: 1.0, w: 12.7,
-      colW: [0.5, 4.5, 2.5, 2.8, 2.4],
+      colW: IS_RTL ? [2.4, 3.5, 6.3, 0.5] : [0.5, 6.3, 3.5, 2.4],
       rowH: 0.32,
       border: { pt: 0.5, color: THEME.tableBorder },
     });
@@ -638,7 +769,7 @@ export async function generateWeeklyReportPPT(projectId: string): Promise<Buffer
     x: 0.5, y: bY4, w: Math.max(0.05, (actualProgress / 100) * 12), h: 0.3,
     fill: { color: THEME.success }, rectRadius: 0.05,
   });
-  slide4.addText(`الإنجاز الفعلي ${actualProgress.toFixed(1)}% / Actual Progress`, {
+  slide4.addText(t(`الإنجاز الفعلي ${actualProgress.toFixed(1)}%`, `Actual Progress ${actualProgress.toFixed(1)}%`, `الإنجاز الفعلي ${actualProgress.toFixed(1)}% / Actual Progress`), {
     x: 0.5, y: bY4, w: 12, h: 0.3, fontSize: 9, bold: true, color: THEME.white, align: 'center', valign: 'middle',
   });
 
@@ -650,34 +781,37 @@ export async function generateWeeklyReportPPT(projectId: string): Promise<Buffer
   if ((cfg.slides as any).nextWeek) {
     const slide5 = createSlide(masterForSlide('nextWeek'));
     addSlideBg(slide5, 'nextWeek');
-    addSlideHeader(slide5, 'خطة الأسبوع القادم - Next Week Plan');
+    addSlideHeader(slide5, t('خطة الأسبوع القادم', 'Next Week Plan', 'خطة الأسبوع القادم - Next Week Plan'));
 
   if (plannedNextWeek.length === 0) {
-    slide5.addText('لا توجد مهام مخططة للأسبوع القادم / No tasks planned for next week', {
+    slide5.addText(t('لا توجد مهام مخططة للأسبوع القادم', 'No tasks planned for next week', 'لا توجد مهام مخططة للأسبوع القادم / No tasks planned for next week'), {
       x: 0.5, y: 2.5, w: 12, h: 1,
       fontSize: 16, color: THEME.lightText, italic: true, align: 'center',
     });
   } else {
-    const rows5: any[][] = [
-      [headerCell('#'), headerCell('المهمة / Task'), headerCell('المرحلة / Phase'), headerCell('المسؤول / Assignee'), headerCell('تاريخ البدء / Start'), headerCell('الموعد النهائي / Due')],
-    ];
+    // RTL: الموعد النهائي | تاريخ البدء | المسؤول | المهمة | #
+    // LTR: # | Task | Assignee | Start Date | Due Date
+    const tw5Header = IS_RTL
+      ? [headerCell(t('الموعد النهائي', 'Due Date')), headerCell(t('تاريخ البدء', 'Start Date')), headerCell(t('المسؤول', 'Assignee')), headerCell(t('المهمة', 'Task')), headerCell('#')]
+      : [headerCell('#'), headerCell('Task'), headerCell('Assignee'), headerCell('Start Date'), headerCell('Due Date')];
+    const rows5: any[][] = [tw5Header];
     plannedNextWeek.slice(0, 18).forEach((task, idx) => {
       const assignee = task.assignedTo ? `${task.assignedTo.firstName} ${task.assignedTo.lastName}` : '-';
-      const phaseName = task.phase?.name || '-';
       const rowFill = idx % 2 === 0 ? {} : { fill: { color: THEME.tableAltRow } };
-      rows5.push([
-        dataCell((idx + 1).toString(), rowFill),
-        dataCell(task.name, { align: 'left', ...rowFill }),
-        dataCell(phaseName, rowFill),
-        dataCell(assignee, rowFill),
-        dataCell(fmtDate(task.startDate), rowFill),
-        dataCell(fmtDate(task.endDate), rowFill),
-      ]);
+      const numCell5   = dataCell((idx + 1).toString(), rowFill);
+      const nameCell5  = dataCell(task.name, { align: IS_RTL ? 'right' : 'left', rtlMode: IS_RTL, ...rowFill });
+      const asnCell5   = dataCell(assignee, rowFill);
+      const startCell5 = dataCell(fmtDate(task.startDate), rowFill);
+      const dueCell5   = dataCell(fmtDate(task.endDate), rowFill);
+      rows5.push(IS_RTL
+        ? [dueCell5, startCell5, asnCell5, nameCell5, numCell5]
+        : [numCell5, nameCell5, asnCell5, startCell5, dueCell5]
+      );
     });
 
     slide5.addTable(rows5, {
       x: 0.3, y: 1.0, w: 12.7,
-      colW: [0.5, 4.0, 2.3, 2.5, 1.7, 1.7],
+      colW: IS_RTL ? [1.7, 1.7, 3.0, 5.8, 0.5] : [0.5, 5.8, 3.0, 1.7, 1.7],
       rowH: 0.32,
       border: { pt: 0.5, color: THEME.tableBorder },
     });
@@ -690,17 +824,39 @@ export async function generateWeeklyReportPPT(projectId: string): Promise<Buffer
     x: 0.5, y: bY5, w: Math.max(0.05, (plannedProgress / 100) * 12), h: 0.3,
     fill: { color: THEME.info }, rectRadius: 0.05,
   });
-  slide5.addText(`الإنجاز المخطط ${plannedProgress.toFixed(1)}% / Planned Progress`, {
+  slide5.addText(t(`الإنجاز المخطط ${plannedProgress.toFixed(1)}%`, `Planned Progress ${plannedProgress.toFixed(1)}%`, `الإنجاز المخطط ${plannedProgress.toFixed(1)}% / Planned Progress`), {
     x: 0.5, y: bY5, w: 12, h: 0.3, fontSize: 9, bold: true, color: THEME.white, align: 'center', valign: 'middle',
   });
 
   } // end nextWeek
 
   // ============================================================
-  //  SLIDE 6: KEY MILESTONES (المعالم الرئيسية)
+  //  SECTION DIVIDER 03: المخاطر / التحديات
   // ============================================================
-  if (cfg.slides.milestones) {
-    // May need multiple slides if too many milestones
+  if (cfg.slides.risksAndChallenges) {
+    const secSlide3 = createSlide('MASTER_SECTION_TITLE');
+    secSlide3.addText('03', {
+      x: IS_RTL ? 0.3 : 9.0, y: 3.5, w: 4.0, h: 2.5,
+      fontSize: 120, bold: true, color: THEME.white, align: IS_RTL ? 'left' : 'right', valign: 'bottom',
+      fontFace: 'Segoe UI', transparency: 20,
+    });
+    secSlide3.addText(t('المخاطر / التحديات', 'Risks & Challenges'), {
+      x: IS_RTL ? 5.0 : 0.3, y: 2.5, w: 8.0, h: 1.2,
+      fontSize: 44, bold: true, color: THEME.white, align: IS_RTL ? 'right' : 'left', valign: 'middle',
+      fontFace: 'Segoe UI', rtlMode: IS_RTL,
+    });
+    if (cfg.language === 'bilingual') {
+      secSlide3.addText('Risks & Challenges', {
+        x: 5.0, y: 3.7, w: 8.0, h: 0.7,
+        fontSize: 22, color: THEME.accent, align: 'right', valign: 'middle',
+        fontFace: 'Segoe UI',
+      });
+    }
+  }
+
+  // NOTE: Milestones block moved to after Executive Summary (Section 01)
+  // The old SLIDE 6 block is removed to avoid duplication
+  if (false) {
     const MILESTONES_PER_PAGE = cfg.milestonesPerPage || 10;
     const milestonePages = Math.max(1, Math.ceil(milestones.length / MILESTONES_PER_PAGE));
 
@@ -798,68 +954,83 @@ export async function generateWeeklyReportPPT(projectId: string): Promise<Buffer
       const slideR = createSlide(masterForSlide('risksAndChallenges'));
       addSlideBg(slideR, 'risksAndChallenges');
       const pageLabel = riskPages > 1 ? ` (${page + 1}/${riskPages})` : '';
-      addSlideHeader(slideR, `المخاطر / التحديات - Risks & Challenges${pageLabel}`);
+      addSlideHeader(slideR, t('المخاطر / التحديات', 'Risks & Challenges', 'المخاطر / التحديات - Risks & Challenges') + pageLabel);
 
     const risksOnPage = activeRisks.slice(page * RISKS_PER_PAGE, (page + 1) * RISKS_PER_PAGE);
 
-    const riskHeaders = [
-      headerCell('وصف الخطر / التحدي\nDescription'),
-      headerCell('التصنيف\nType'),
-      headerCell('النطاق\nScope'),
-      headerCell('الفئة\nPriority'),
-      headerCell('الاحتمالية\nProbability'),
-      headerCell('التأثير\nImpact'),
-      headerCell('خطة المعالجة\nMitigation Plan'),
-      headerCell('تاريخ الإغلاق المستهدف\nTarget Close'),
-      headerCell('المسؤول\nOwner'),
-      headerCell('الحالة\nStatus'),
+    // RTL: حالة | مسؤول | تاريخ إغلاق | خطة معالجة | تأثير | احتمال | فئة | نطاق | نوع | وصف
+    // LTR: Description | Type | Scope | Priority | Probability | Impact | Mitigation | Target | Owner | Status
+    const riskHeaderRow = IS_RTL ? [
+      headerCell(t('الحالة', 'Status')),
+      headerCell(t('المسؤول', 'Owner')),
+      headerCell(t('تاريخ الإغلاق', 'Target Close')),
+      headerCell(t('خطة المعالجة', 'Mitigation')),
+      headerCell(t('التأثير', 'Impact')),
+      headerCell(t('الاحتمالية', 'Probability')),
+      headerCell(t('الفئة', 'Priority')),
+      headerCell(t('النطاق', 'Scope')),
+      headerCell(t('التصنيف', 'Type')),
+      headerCell(t('وصف الخطر', 'Description')),
+    ] : [
+      headerCell('Description'),
+      headerCell('Type'),
+      headerCell('Scope'),
+      headerCell('Priority'),
+      headerCell('Probability'),
+      headerCell('Impact'),
+      headerCell('Mitigation'),
+      headerCell('Target Close'),
+      headerCell('Owner'),
+      headerCell('Status'),
     ];
 
-    const riskRows: any[][] = [riskHeaders];
+    const riskRows: any[][] = [riskHeaderRow];
 
     risksOnPage.forEach((item, idx) => {
       const rowFill = idx % 2 === 0 ? {} : { fill: { color: THEME.tableAltRow } };
       const ownerName = item.owner ? `${item.owner.firstName} ${item.owner.lastName}` : '-';
 
-      // Map probability & impact enums to Arabic/English
-      const probMap: Record<string, string> = {
-        VERY_LOW: 'منخفض جداً', LOW: 'منخفض', MEDIUM: 'متوسط', HIGH: 'عالي', VERY_HIGH: 'عالي جداً',
-      };
-      const impactMap: Record<string, string> = {
-        LOW: 'منخفض', MEDIUM: 'متوسط', HIGH: 'عالي', VERY_HIGH: 'عالي جداً', CRITICAL: 'حرج',
-      };
-      const statusMap: Record<string, string> = {
-        OPEN: 'مفتوح', IN_PROGRESS: 'قيد المعالجة', MITIGATED: 'تم التخفيف', CLOSED: 'مغلق',
-      };
+      const probMap: Record<string, string> = IS_RTL
+        ? { VERY_LOW: 'منخفض جداً', LOW: 'منخفض', MEDIUM: 'متوسط', HIGH: 'عالي', VERY_HIGH: 'عالي جداً' }
+        : { VERY_LOW: 'Very Low', LOW: 'Low', MEDIUM: 'Medium', HIGH: 'High', VERY_HIGH: 'Very High' };
+      const impactMap: Record<string, string> = IS_RTL
+        ? { LOW: 'منخفض', MEDIUM: 'متوسط', HIGH: 'عالي', VERY_HIGH: 'عالي جداً', CRITICAL: 'حرج' }
+        : { LOW: 'Low', MEDIUM: 'Medium', HIGH: 'High', VERY_HIGH: 'Very High', CRITICAL: 'Critical' };
+      const statusMap: Record<string, string> = IS_RTL
+        ? { OPEN: 'مفتوح', IN_PROGRESS: 'قيد المعالجة', MITIGATED: 'تم التخفيف', CLOSED: 'مغلق' }
+        : { OPEN: 'Open', IN_PROGRESS: 'In Progress', MITIGATED: 'Mitigated', CLOSED: 'Closed' };
 
       const statusClr = item.status === 'CLOSED' ? THEME.success
         : item.status === 'MITIGATED' ? THEME.warning
         : item.status === 'OPEN' ? THEME.danger
         : THEME.info;
 
-      riskRows.push([
-        dataCell(item.title, { align: 'left', fontSize: 7, ...rowFill }),
-        dataCell(item.type === 'RISK' ? 'خطر / Risk' : 'تحدي / Issue', rowFill),
-        dataCell(item.impactDescription ? item.impactDescription.substring(0, 20) : '-', { fontSize: 7, ...rowFill }),
-        dataCell(item.priority || '-', rowFill),
-        dataCell(item.probability ? probMap[item.probability] || item.probability : '-', rowFill),
-        dataCell(item.impact ? impactMap[item.impact] || item.impact : '-', rowFill),
-        dataCell(item.mitigation ? item.mitigation.substring(0, 35) : '-', { align: 'left', fontSize: 7, ...rowFill }),
-        dataCell(fmtDate(item.targetDate || item.revisedTargetDate), rowFill),
-        dataCell(ownerName, rowFill),
-        dataCell(statusMap[item.status] || item.status, { color: statusClr, bold: true, ...rowFill }),
-      ]);
+      const descCell   = dataCell(item.title, { align: IS_RTL ? 'right' : 'left', fontSize: 7, rtlMode: IS_RTL, ...rowFill });
+      const typeCell   = dataCell(item.type === 'RISK' ? t('خطر', 'Risk', 'خطر / Risk') : t('تحدي', 'Issue', 'تحدي / Issue'), rowFill);
+      const scopeCell  = dataCell(item.impactDescription ? item.impactDescription.substring(0, 20) : '-', { fontSize: 7, ...rowFill });
+      const priCell    = dataCell(item.priority || '-', rowFill);
+      const probCell   = dataCell(item.probability ? probMap[item.probability] || item.probability : '-', rowFill);
+      const impCell    = dataCell(item.impact ? impactMap[item.impact] || item.impact : '-', rowFill);
+      const mitiCell   = dataCell(item.mitigation ? item.mitigation.substring(0, 35) : '-', { align: IS_RTL ? 'right' : 'left', fontSize: 7, ...rowFill });
+      const targetCell = dataCell(fmtDate(item.targetDate || item.revisedTargetDate), rowFill);
+      const ownerCell  = dataCell(ownerName, rowFill);
+      const statusCell = dataCell(statusMap[item.status] || item.status, { color: statusClr, bold: true, ...rowFill });
+
+      riskRows.push(IS_RTL
+        ? [statusCell, ownerCell, targetCell, mitiCell, impCell, probCell, priCell, scopeCell, typeCell, descCell]
+        : [descCell, typeCell, scopeCell, priCell, probCell, impCell, mitiCell, targetCell, ownerCell, statusCell]
+      );
     });
 
     slideR.addTable(riskRows, {
       x: 0.15, y: 1.0, w: 13.0,
-      colW: [2.2, 1.0, 1.0, 0.8, 1.0, 0.9, 2.2, 1.2, 1.3, 1.0],
+      colW: IS_RTL ? [1.0, 1.3, 1.2, 2.2, 0.9, 1.0, 0.8, 1.0, 1.0, 2.2] : [2.2, 1.0, 1.0, 0.8, 1.0, 0.9, 2.2, 1.2, 1.3, 1.0],
       rowH: 0.42,
       border: { pt: 0.5, color: THEME.tableBorder },
     });
 
     if (activeRisks.length === 0) {
-      slideR.addText('لا توجد مخاطر أو تحديات نشطة حالياً', {
+      slideR.addText(t('لا توجد مخاطر أو تحديات نشطة حالياً', 'No active risks or challenges', 'لا توجد مخاطر أو تحديات نشطة / No active risks'), {
         x: 1, y: 3, w: 11, h: 1,
         fontSize: 16, color: THEME.lightText, italic: true, align: 'center',
       });
@@ -867,6 +1038,23 @@ export async function generateWeeklyReportPPT(projectId: string): Promise<Buffer
   }
 
   } // end risksAndChallenges
+
+  // ============================================================
+  //  THANK YOU SLIDE (شكراً)
+  // ============================================================
+  const slideThx = createSlide('MASTER_SECTION_TITLE');
+  slideThx.addText(t('شكراً', 'Thank You'), {
+    x: IS_RTL ? 5.5 : 0.3, y: 2.8, w: 7.5, h: 1.5,
+    fontSize: 72, bold: true, color: THEME.white, align: IS_RTL ? 'right' : 'left', valign: 'middle',
+    fontFace: 'Segoe UI', rtlMode: IS_RTL,
+  });
+  if (cfg.language === 'bilingual') {
+    slideThx.addText('Thank You', {
+      x: 5.5, y: 4.3, w: 7.5, h: 0.7,
+      fontSize: 24, color: THEME.accent, align: 'right', valign: 'middle',
+      fontFace: 'Segoe UI',
+    });
+  }
 
   // ============================================================
   //  Generate PowerPoint buffer

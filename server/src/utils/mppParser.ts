@@ -14,6 +14,10 @@ export interface ParsedTask {
   name: string;
   start: string;
   finish: string;
+  actualStart?: string;
+  actualFinish?: string;
+  baselineStart?: string;
+  baselineFinish?: string;
   duration: number; // in days
   percentComplete: number;
   priority: number;
@@ -143,12 +147,28 @@ export async function parseMPPXML(xmlContent: string, hoursPerDay: number = 8): 
         const outlineNumber = task.OutlineNumber || undefined;
         
         console.log(`[MPP Parser] Task UID ${task.UID}: "${task.Name}" - OutlineNumber: "${outlineNumber || 'NONE'}", OutlineLevel: ${outlineLevel}`);
+        console.log(`[MPP Parser]   BaselineStart raw: ${JSON.stringify(task.BaselineStart)}, Baseline[]: ${JSON.stringify(task.Baseline)}`);
 
         return {
           uid: task.UID.toString(),
           name: task.Name,
           start: task.Start || startDate,
           finish: task.Finish || task.Start || startDate,
+          actualStart:    task.ActualStart  && task.ActualStart  !== 'NA' ? task.ActualStart  : undefined,
+          actualFinish:   task.ActualFinish && task.ActualFinish !== 'NA' ? task.ActualFinish : undefined,
+          baselineStart:  (() => {
+            // Try direct field first, then nested Baseline[Number=0] element
+            if (task.BaselineStart && task.BaselineStart !== 'NA') return task.BaselineStart;
+            const baselines = task.Baseline ? (Array.isArray(task.Baseline) ? task.Baseline : [task.Baseline]) : [];
+            const b0 = baselines.find((b: any) => String(b.Number) === '0');
+            return b0?.Start && b0.Start !== 'NA' ? b0.Start : undefined;
+          })(),
+          baselineFinish: (() => {
+            if (task.BaselineFinish && task.BaselineFinish !== 'NA') return task.BaselineFinish;
+            const baselines = task.Baseline ? (Array.isArray(task.Baseline) ? task.Baseline : [task.Baseline]) : [];
+            const b0 = baselines.find((b: any) => String(b.Number) === '0');
+            return b0?.Finish && b0.Finish !== 'NA' ? b0.Finish : undefined;
+          })(),
           duration: durationDays,
           percentComplete: parseFloat(task.PercentComplete || '0'),
           priority: parseInt(task.Priority || '500', 10),

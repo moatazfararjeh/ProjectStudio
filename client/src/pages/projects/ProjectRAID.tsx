@@ -1,5 +1,5 @@
 import RightDrawer from '../../components/RightDrawer';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -17,6 +17,7 @@ import {
   Row,
   Col,
   Statistic,
+  Popconfirm,
 } from 'antd';
 import {
   PlusOutlined,
@@ -26,6 +27,7 @@ import {
   DownloadOutlined,
   UploadOutlined,
   FileExcelOutlined,
+  FilterOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import ExcelJS from 'exceljs';
@@ -45,6 +47,8 @@ export default function ProjectRAID({ project }: ProjectRAIDProps) {
   const [editingItem, setEditingItem] = useState<any>(null);
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
+  const [typeFilter, setTypeFilter] = useState<string | null>(null);
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
   const selectedType = Form.useWatch('type', form);
 
   // Fields visibility per RAID type
@@ -103,6 +107,29 @@ export default function ProjectRAID({ project }: ProjectRAIDProps) {
       message.error(error?.response?.data?.message || t('common.error'));
     },
   });
+
+  // Bulk delete
+  const handleBulkDelete = () => {
+    antdModal.confirm({
+      title: t('common.confirmDelete'),
+      icon: <ExclamationCircleOutlined />,
+      content: `${selectedRowKeys.length} ${t('raid.itemsSelected')}`,
+      onOk: async () => {
+        for (const id of selectedRowKeys) {
+          await api.deleteRAIDItem(id as string);
+        }
+        setSelectedRowKeys([]);
+        queryClient.invalidateQueries({ queryKey: ['raid-items', project.id] });
+        message.success(t('raid.deleteSuccess'));
+      },
+    });
+  };
+
+  // Filtered items
+  const filteredItems = useMemo(() => {
+    if (!typeFilter) return raidItems;
+    return raidItems.filter((item: any) => item.type === typeFilter);
+  }, [raidItems, typeFilter]);
 
   const handleAdd = () => {
     setEditingItem(null);
@@ -182,73 +209,67 @@ export default function ProjectRAID({ project }: ProjectRAIDProps) {
     }
   };
 
-  // Download Excel template for import
+  // Download Excel template — PGD RAID Log (4 sheets)
   const handleDownloadTemplate = async () => {
     try {
       const workbook = new ExcelJS.Workbook();
-      const ws = workbook.addWorksheet('RAID Import');
 
-      if (t('dir') === 'rtl') {
-        ws.views = [{ rightToLeft: true }];
-      }
+      const applyHeader = (ws: ExcelJS.Worksheet, headers: string[], bgColor: string, widths: number[]) => {
+        ws.views = [{ state: 'frozen', ySplit: 1 }];
+        ws.columns = headers.map((h, i) => ({ header: h, width: widths[i] || 20 }));
+        const row = ws.getRow(1);
+        row.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+        row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + bgColor } };
+        row.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+        row.height = 36;
+        row.eachCell(cell => {
+          cell.border = {
+            top: { style: 'thin' }, bottom: { style: 'thin' },
+            left: { style: 'thin' }, right: { style: 'thin' },
+          };
+        });
+      };
 
-      // Column headers (must match import parser)
-      const headers = [
-        'Type*',
-        'Title*',
-        'Description*',
-        'Status',
-        'Priority',
-        'Owner (Email)',
-        'Impact Description',
-        'Impact',
-        'Probability',
-        'Mitigation',
-        'Mitigation Owner (Email)',
-        'Target Date (YYYY-MM-DD)',
-        'Comments',
-      ];
+      // ── Assumptions ──────────────────────────────────────────────────
+      const wsA = workbook.addWorksheet('Assumptions');
+      applyHeader(wsA, [
+        '#', 'Raised Date', 'Raised By', 'Assumption / Action Description',
+        'Type', 'Owner', 'Status', 'Dependency',
+        'Due Date', 'Revised Due Date', 'Closed Date',
+        'History Comments / Progress', 'Days Overdue', 'Status Flag',
+      ], '1F4E79', [5, 14, 20, 45, 12, 20, 14, 20, 14, 16, 14, 40, 13, 14]);
 
-      ws.addRow(headers);
-      const headerRow = ws.getRow(1);
-      headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-      headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4472C4' } };
-      headerRow.alignment = { horizontal: 'center', vertical: 'middle' };
-      headerRow.height = 28;
+      // ── Dependencies ─────────────────────────────────────────────────
+      const wsD = workbook.addWorksheet('Dependencies');
+      applyHeader(wsD, [
+        'No.', 'Dependent Milestone/Task', 'Dependency', 'Dependency Owner Name',
+        'Due Date', 'Original Committed Date', 'Status', 'Revised Due Date',
+        'Actual Closing Date', 'Impact Sum (days)\n+ = Negative | - = Positive',
+        'History Comments', 'Days Until Due', 'Status Flag',
+      ], '375623', [5, 30, 40, 22, 14, 22, 14, 16, 18, 22, 40, 13, 14]);
 
-      // Column widths
-      ws.columns = [
-        { width: 18 }, { width: 35 }, { width: 40 }, { width: 15 },
-        { width: 15 }, { width: 25 }, { width: 40 }, { width: 15 },
-        { width: 15 }, { width: 40 }, { width: 25 }, { width: 20 },
-        { width: 30 },
-      ];
+      // ── Risks ─────────────────────────────────────────────────────────
+      const wsR = workbook.addWorksheet('Risks');
+      applyHeader(wsR, [
+        '#', 'Risk Title', 'Responsibility', 'Raised Date', 'Impact Description',
+        'Status', 'Priority', 'Impact', 'Probability', 'Mitigation Plan',
+        'Mitigation Owner', 'History Comments', 'Closure Due Date',
+        'Revised Closure Due Date', 'Actual Closure Date',
+        'Risk Score', 'Risk Level', 'Days Open',
+      ], '833C00', [5, 30, 20, 14, 40, 14, 12, 12, 14, 40, 20, 35, 16, 22, 18, 11, 12, 11]);
 
-      // Data validation dropdowns
-      const typeValidation = { type: 'list' as const, formulae: ['"RISK,ASSUMPTION,ISSUE,DEPENDENCY"'] };
-      const statusValidation = { type: 'list' as const, formulae: ['"OPEN,IN_PROGRESS,MITIGATED,CLOSED"'] };
-      const priorityValidation = { type: 'list' as const, formulae: ['"LOW,MEDIUM,HIGH,CRITICAL"'] };
-      const impactValidation = { type: 'list' as const, formulae: ['"LOW,MEDIUM,HIGH,VERY_HIGH,CRITICAL"'] };
-      const probValidation = { type: 'list' as const, formulae: ['"VERY_LOW,LOW,MEDIUM,HIGH,VERY_HIGH"'] };
+      // ── Issues ────────────────────────────────────────────────────────
+      const wsI = workbook.addWorksheet('Issues');
+      applyHeader(wsI, [
+        'No.', 'Issue Title', 'Assigned To', 'Status', 'Impact',
+        'Impact Phase/Milestone', 'Project Timeline Impact (+,- Days)',
+        'Support Needed', 'Owner', 'History Comments',
+        'Date Raised', 'Baseline Due Date', 'Revised Due Date',
+        'Closure Date', 'Days Open', 'Days Overdue', 'Urgency',
+      ], '7030A0', [5, 30, 20, 14, 12, 25, 22, 20, 20, 40, 14, 16, 14, 14, 11, 13, 14]);
 
-      for (let row = 2; row <= 100; row++) {
-        ws.getCell(`A${row}`).dataValidation = typeValidation;
-        ws.getCell(`D${row}`).dataValidation = statusValidation;
-        ws.getCell(`E${row}`).dataValidation = priorityValidation;
-        ws.getCell(`H${row}`).dataValidation = impactValidation;
-        ws.getCell(`I${row}`).dataValidation = probValidation;
-      }
-
-      // Add example rows
-      ws.addRow(['RISK', 'Example Risk', 'Description of the risk', 'OPEN', 'HIGH', '', 'Impact details', 'HIGH', 'MEDIUM', 'Mitigation plan', '', '', '']);
-      ws.addRow(['ISSUE', 'Example Issue', 'Description of the issue', 'OPEN', 'MEDIUM', '', 'Impact details', 'MEDIUM', '', 'Resolution plan', '', '', '']);
-      ws.addRow(['ASSUMPTION', 'Example Assumption', 'Assumption description', 'OPEN', 'LOW', '', '', '', '', '', '', '', '']);
-      ws.addRow(['DEPENDENCY', 'Example Dependency', 'Dependency description', 'OPEN', 'MEDIUM', '', '', '', '', '', '', '', '']);
-
-      // Style example rows
-      for (let r = 2; r <= 5; r++) {
-        ws.getRow(r).font = { italic: true, color: { argb: 'FF888888' } };
-      }
+      // suppress unused warnings
+      void wsA; void wsD; void wsR; void wsI;
 
       const buffer = await workbook.xlsx.writeBuffer();
       const blob = new Blob([buffer], {
@@ -257,8 +278,10 @@ export default function ProjectRAID({ project }: ProjectRAIDProps) {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `RAID_Import_Template.xlsx`;
+      link.download = `PGD_RAID_Log_Template.xlsx`;
+      document.body.appendChild(link);
       link.click();
+      document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Template download failed:', error);
@@ -276,112 +299,254 @@ export default function ProjectRAID({ project }: ProjectRAIDProps) {
       const arrayBuffer = await file.arrayBuffer();
       await workbook.xlsx.load(arrayBuffer);
 
-      const worksheet = workbook.getWorksheet(1);
-      if (!worksheet) {
-        message.error(t('raid.importNoSheet'));
-        setImporting(false);
-        return;
-      }
-
       // Build user lookup by email
       const userMap = new Map<string, string>();
       users.forEach((u: any) => {
         if (u.email) userMap.set(u.email.toLowerCase(), u.id);
       });
 
-      const validTypes = ['RISK', 'ASSUMPTION', 'ISSUE', 'DEPENDENCY'];
-      const validStatuses = ['OPEN', 'IN_PROGRESS', 'MITIGATED', 'CLOSED'];
+      const validStatuses  = ['OPEN', 'IN_PROGRESS', 'MITIGATED', 'CLOSED'];
       const validPriorities = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
-      const validImpacts = ['LOW', 'MEDIUM', 'HIGH', 'VERY_HIGH', 'CRITICAL'];
-      const validProbs = ['VERY_LOW', 'LOW', 'MEDIUM', 'HIGH', 'VERY_HIGH'];
+      const validImpacts   = ['LOW', 'MEDIUM', 'HIGH', 'VERY_HIGH', 'CRITICAL'];
+      const validProbs     = ['VERY_LOW', 'LOW', 'MEDIUM', 'HIGH', 'VERY_HIGH'];
 
       const rows: any[] = [];
       const errors: string[] = [];
 
-      worksheet.eachRow((row, rowNumber) => {
-        if (rowNumber === 1) return; // Skip header
-
-        const cellVal = (col: number) => {
-          const cell = row.getCell(col);
-          const v = cell?.value;
-          if (v === null || v === undefined) return '';
-          if (typeof v === 'object' && 'text' in v) return (v as any).text?.toString().trim() || '';
-          if (typeof v === 'object' && 'result' in v) return (v as any).result?.toString().trim() || '';
-          return v.toString().trim();
-        };
-
-        const type = cellVal(1).toUpperCase();
-        const title = cellVal(2);
-        const description = cellVal(3);
-        const status = cellVal(4).toUpperCase() || 'OPEN';
-        const priority = cellVal(5).toUpperCase() || 'MEDIUM';
-        const ownerEmail = cellVal(6).toLowerCase();
-        const impactDescription = cellVal(7);
-        const impact = cellVal(8).toUpperCase();
-        const probability = cellVal(9).toUpperCase();
-        const mitigation = cellVal(10);
-        const mitigationOwnerEmail = cellVal(11).toLowerCase();
-        const targetDateStr = cellVal(12);
-        const comments = cellVal(13);
-
-        // Validate required fields
-        if (!type || !title || !description) {
-          if (type || title || description) {
-            errors.push(t('raid.importRowError', { row: rowNumber, reason: t('raid.importMissingRequired') }));
+      const cellVal = (row: ExcelJS.Row, col: number): string => {
+        const cell = row.getCell(col);
+        const v = cell?.value;
+        if (v === null || v === undefined) return '';
+        if (v instanceof Date) return v.toISOString();
+        if (typeof v === 'object') {
+          if ('richText' in v) return (v as any).richText?.map((r: any) => r.text || '').join('').trim() || '';
+          if ('text' in v) return (v as any).text?.toString().trim() || '';
+          if ('result' in v) {
+            const r = (v as any).result;
+            if (r instanceof Date) return r.toISOString();
+            if (typeof r === 'object' && r !== null && 'richText' in r) return (r as any).richText?.map((x: any) => x.text || '').join('').trim() || '';
+            return r?.toString().trim() || '';
           }
-          return; // Skip blank rows silently
+          return '';
+        }
+        return v.toString().trim();
+      };
+
+      // Returns dayjs ISO string if the cell contains a valid date, otherwise ''
+      const cellDate = (row: ExcelJS.Row, col: number): string => {
+        const cell = row.getCell(col);
+        const v = cell?.value;
+        if (v === null || v === undefined) return '';
+        if (v instanceof Date) return dayjs(v).isValid() ? dayjs(v).toISOString() : '';
+        if (typeof v === 'object' && 'result' in v) {
+          const r = (v as any).result;
+          if (r instanceof Date) return dayjs(r).isValid() ? dayjs(r).toISOString() : '';
+          const d = dayjs(r?.toString());
+          return d.isValid() ? d.toISOString() : '';
+        }
+        const d = dayjs(v.toString().trim());
+        return d.isValid() ? d.toISOString() : '';
+      };
+
+      // Detect format: PGD 4-sheet or legacy single-sheet
+      const wsAssumptions  = workbook.getWorksheet('Assumptions');
+      const wsDependencies = workbook.getWorksheet('Dependencies');
+      const wsRisks        = workbook.getWorksheet('Risks');
+      const wsIssues       = workbook.getWorksheet('Issues');
+      const isPGDFormat    = wsAssumptions || wsDependencies || wsRisks || wsIssues;
+
+      if (isPGDFormat) {
+        // ── PGD 4-sheet format ────────────────────────────────────────
+        // Assumptions: #(1) RaisedDate(2) RaisedBy(3) Description(4) Type(5)
+        //              Owner(6) Status(7) Dependency(8) DueDate(9) RevisedDue(10) ClosedDate(11) Comments(12)
+        if (wsAssumptions) {
+          wsAssumptions.eachRow((row, rowNumber) => {
+            if (rowNumber === 1) return;
+            const raisedDate  = cellDate(row, 2);
+            const description = cellVal(row, 4);
+            const owner       = cellVal(row, 6);
+            const status      = (cellVal(row, 7).toUpperCase() || 'OPEN');
+            const dueDate     = cellDate(row, 9);
+            const revisedDue  = cellDate(row, 10);
+            const closedDate  = cellDate(row, 11);
+            const comments    = cellVal(row, 12);
+            if (!description) return;
+            const data: any = {
+              type: 'ASSUMPTION',
+              title: description.substring(0, 100),
+              description,
+              status: validStatuses.includes(status) ? status : 'OPEN',
+              priority: 'MEDIUM',
+              projectId: project.id,
+            };
+            if (owner && userMap.has(owner.toLowerCase())) data.ownerId = userMap.get(owner.toLowerCase());
+            if (comments) data.comments = comments;
+            if (raisedDate)  data.identifiedDate    = raisedDate;
+            if (dueDate)     data.targetDate        = dueDate;
+            if (revisedDue)  data.revisedTargetDate = revisedDue;
+            if (closedDate)  data.closedDate        = closedDate;
+            rows.push(data);
+          });
         }
 
-        if (!validTypes.includes(type)) {
-          errors.push(t('raid.importRowError', { row: rowNumber, reason: `Invalid type: ${type}` }));
-          return;
-        }
-        if (status && !validStatuses.includes(status)) {
-          errors.push(t('raid.importRowError', { row: rowNumber, reason: `Invalid status: ${status}` }));
-          return;
-        }
-        if (priority && !validPriorities.includes(priority)) {
-          errors.push(t('raid.importRowError', { row: rowNumber, reason: `Invalid priority: ${priority}` }));
-          return;
-        }
-        if (impact && !validImpacts.includes(impact)) {
-          errors.push(t('raid.importRowError', { row: rowNumber, reason: `Invalid impact: ${impact}` }));
-          return;
-        }
-        if (probability && !validProbs.includes(probability)) {
-          errors.push(t('raid.importRowError', { row: rowNumber, reason: `Invalid probability: ${probability}` }));
-          return;
-        }
-
-        const data: any = {
-          type,
-          title,
-          description,
-          status,
-          priority,
-          projectId: project.id,
-        };
-
-        if (ownerEmail && userMap.has(ownerEmail)) data.ownerId = userMap.get(ownerEmail);
-        if (impactDescription) data.impactDescription = impactDescription;
-        if (impact) data.impact = impact;
-        if (probability) data.probability = probability;
-        if (mitigation) data.mitigation = mitigation;
-        if (mitigationOwnerEmail && userMap.has(mitigationOwnerEmail)) data.mitigationOwnerId = userMap.get(mitigationOwnerEmail);
-        if (comments) data.comments = comments;
-        if (targetDateStr) {
-          const parsed = dayjs(targetDateStr);
-          if (parsed.isValid()) data.targetDate = parsed.toISOString();
+        // Dependencies: No(1) Milestone(2) Dependency(3) OwnerName(4) DueDate(5)
+        //               OriginalCommitted(6) Status(7) RevisedDue(8) ActualClose(9) ImpactSum(10) Comments(11)
+        if (wsDependencies) {
+          wsDependencies.eachRow((row, rowNumber) => {
+            if (rowNumber === 1) return;
+            const title            = cellVal(row, 2);
+            const dependency       = cellVal(row, 3);
+            const dueDate          = cellDate(row, 5);
+            const originalCommitted= cellDate(row, 6);
+            const status           = (cellVal(row, 7).toUpperCase() || 'OPEN');
+            const revisedDue       = cellDate(row, 8);
+            const closedDate       = cellDate(row, 9);
+            const comments         = cellVal(row, 11);
+            if (!title && !dependency) return;
+            const data: any = {
+              type: 'DEPENDENCY',
+              title: title || dependency.substring(0, 100),
+              description: dependency || title,
+              status: validStatuses.includes(status) ? status : 'OPEN',
+              priority: 'MEDIUM',
+              projectId: project.id,
+            };
+            if (comments) data.comments = comments;
+            if (originalCommitted) data.identifiedDate    = originalCommitted;
+            if (dueDate)           data.targetDate        = dueDate;
+            if (revisedDue)        data.revisedTargetDate = revisedDue;
+            if (closedDate)        data.closedDate        = closedDate;
+            rows.push(data);
+          });
         }
 
-        rows.push(data);
-      });
+        // Risks: #(1) Title(2) Responsibility(3) RaisedDate(4) ImpactDesc(5)
+        //        Status(6) Priority(7) Impact(8) Probability(9) MitigationPlan(10)
+        //        MitigationOwner(11) Comments(12) ClosureDue(13) RevisedClosure(14) ActualClosure(15)
+        if (wsRisks) {
+          wsRisks.eachRow((row, rowNumber) => {
+            if (rowNumber === 1) return;
+            const title            = cellVal(row, 2);
+            const raisedDate       = cellDate(row, 4);
+            const impactDesc       = cellVal(row, 5);
+            const status           = (cellVal(row, 6).toUpperCase() || 'OPEN');
+            const priority         = (cellVal(row, 7).toUpperCase() || 'MEDIUM');
+            const impact           = cellVal(row, 8).toUpperCase();
+            const probability      = cellVal(row, 9).toUpperCase();
+            const mitigation       = cellVal(row, 10);
+            const mitigationOwner  = cellVal(row, 11);
+            const comments         = cellVal(row, 12);
+            const closureDue       = cellDate(row, 13);
+            const revisedClosure   = cellDate(row, 14);
+            const actualClosure    = cellDate(row, 15);
+            if (!title) return;
+            const data: any = {
+              type: 'RISK',
+              title,
+              description: impactDesc || title,
+              status:   validStatuses.includes(status)    ? status    : 'OPEN',
+              priority: validPriorities.includes(priority) ? priority  : 'MEDIUM',
+              projectId: project.id,
+            };
+            if (impactDesc) data.impactDescription = impactDesc;
+            if (impact      && validImpacts.includes(impact))     data.impact = impact;
+            if (probability && validProbs.includes(probability))  data.probability = probability;
+            if (mitigation) data.mitigation = mitigation;
+            if (mitigationOwner && userMap.has(mitigationOwner.toLowerCase())) data.mitigationOwnerId = userMap.get(mitigationOwner.toLowerCase());
+            if (comments) data.comments = comments;
+            if (raisedDate)      data.identifiedDate    = raisedDate;
+            if (closureDue)      data.targetDate        = closureDue;
+            if (revisedClosure)  data.revisedTargetDate = revisedClosure;
+            if (actualClosure)   data.closedDate        = actualClosure;
+            rows.push(data);
+          });
+        }
+
+        // Issues: No(1) Title(2) AssignedTo(3) Status(4) Impact(5)
+        //         ImpactPhase(6) TimelineImpact(7) SupportNeeded(8) Owner(9) Comments(10)
+        //         DateRaised(11) BaselineDue(12) RevisedDue(13) ClosureDate(14)
+        if (wsIssues) {
+          wsIssues.eachRow((row, rowNumber) => {
+            if (rowNumber === 1) return;
+            const title      = cellVal(row, 2);
+            const assignedTo = cellVal(row, 3);
+            const status     = (cellVal(row, 4).toUpperCase() || 'OPEN');
+            const impact     = cellVal(row, 5).toUpperCase();
+            const owner      = cellVal(row, 9);
+            const comments   = cellVal(row, 10);
+            const dateRaised = cellDate(row, 11);
+            const baselineDue= cellDate(row, 12);
+            const revisedDue = cellDate(row, 13);
+            const closedDate = cellDate(row, 14);
+            if (!title) return;
+            const ownerEmail = owner.toLowerCase() || assignedTo.toLowerCase();
+            const data: any = {
+              type: 'ISSUE',
+              title,
+              description: title,
+              status: validStatuses.includes(status) ? status : 'OPEN',
+              priority: 'MEDIUM',
+              projectId: project.id,
+            };
+            if (impact && validImpacts.includes(impact)) data.impact = impact;
+            if (ownerEmail && userMap.has(ownerEmail)) data.ownerId = userMap.get(ownerEmail);
+            if (comments) data.comments = comments;
+            if (dateRaised)  data.identifiedDate    = dateRaised;
+            if (baselineDue) data.targetDate        = baselineDue;
+            if (revisedDue)  data.revisedTargetDate = revisedDue;
+            if (closedDate)  data.closedDate        = closedDate;
+            rows.push(data);
+          });
+        }
+      } else {
+        // ── Legacy single-sheet format ────────────────────────────────
+        const worksheet = workbook.getWorksheet(1);
+        if (!worksheet) {
+          message.error(t('raid.importNoSheet'));
+          setImporting(false);
+          return;
+        }
+        const validTypes = ['RISK', 'ASSUMPTION', 'ISSUE', 'DEPENDENCY'];
+        worksheet.eachRow((row, rowNumber) => {
+          if (rowNumber === 1) return;
+          const type        = cellVal(row, 1).toUpperCase();
+          const title       = cellVal(row, 2);
+          const description = cellVal(row, 3);
+          const status      = cellVal(row, 4).toUpperCase() || 'OPEN';
+          const priority    = cellVal(row, 5).toUpperCase() || 'MEDIUM';
+          const ownerEmail  = cellVal(row, 6).toLowerCase();
+          const impactDescription = cellVal(row, 7);
+          const impact      = cellVal(row, 8).toUpperCase();
+          const probability = cellVal(row, 9).toUpperCase();
+          const mitigation  = cellVal(row, 10);
+          const mitigationOwnerEmail = cellVal(row, 11).toLowerCase();
+          const targetDateStr = cellVal(row, 12);
+          const comments    = cellVal(row, 13);
+          if (!type || !title || !description) {
+            if (type || title || description) errors.push(t('raid.importRowError', { row: rowNumber, reason: t('raid.importMissingRequired') }));
+            return;
+          }
+          if (!validTypes.includes(type)) { errors.push(t('raid.importRowError', { row: rowNumber, reason: `Invalid type: ${type}` })); return; }
+          if (status && !validStatuses.includes(status)) { errors.push(t('raid.importRowError', { row: rowNumber, reason: `Invalid status: ${status}` })); return; }
+          if (priority && !validPriorities.includes(priority)) { errors.push(t('raid.importRowError', { row: rowNumber, reason: `Invalid priority: ${priority}` })); return; }
+          if (impact && !validImpacts.includes(impact)) { errors.push(t('raid.importRowError', { row: rowNumber, reason: `Invalid impact: ${impact}` })); return; }
+          if (probability && !validProbs.includes(probability)) { errors.push(t('raid.importRowError', { row: rowNumber, reason: `Invalid probability: ${probability}` })); return; }
+          const data: any = { type, title, description, status, priority, projectId: project.id };
+          if (ownerEmail && userMap.has(ownerEmail)) data.ownerId = userMap.get(ownerEmail);
+          if (impactDescription) data.impactDescription = impactDescription;
+          if (impact) data.impact = impact;
+          if (probability) data.probability = probability;
+          if (mitigation) data.mitigation = mitigation;
+          if (mitigationOwnerEmail && userMap.has(mitigationOwnerEmail)) data.mitigationOwnerId = userMap.get(mitigationOwnerEmail);
+          if (comments) data.comments = comments;
+          if (targetDateStr) { const parsed = dayjs(targetDateStr); if (parsed.isValid()) data.targetDate = parsed.toISOString(); }
+          rows.push(data);
+        });
+      } // end else (legacy single-sheet)
 
       if (rows.length === 0) {
         message.warning(t('raid.importNoData'));
-        if (errors.length > 0) {
-          Modal.error({ title: t('raid.importErrors'), content: errors.join('\n'), width: 500 });
-        }
+        if (errors.length > 0) Modal.error({ title: t('raid.importErrors'), content: errors.join('\n'), width: 500 });
         setImporting(false);
         return;
       }
@@ -436,134 +601,18 @@ export default function ProjectRAID({ project }: ProjectRAIDProps) {
   const assumptions = raidItems.filter((item: any) => item.type === 'ASSUMPTION').length;
   const dependencies = raidItems.filter((item: any) => item.type === 'DEPENDENCY').length;
 
-  // Export to Excel
+  // Export to Excel — PGD RAID Log Template (4 sheets)
   const handleExport = async () => {
     try {
-      const workbook = new ExcelJS.Workbook();
-      const worksheet = workbook.addWorksheet(t('raid.raidLog'));
-
-      // Set RTL if Arabic
-      if (t('dir') === 'rtl') {
-        worksheet.views = [{ rightToLeft: true }];
-      }
-
-      // Add title
-      worksheet.mergeCells('A1:M1');
-      const titleCell = worksheet.getCell('A1');
-      titleCell.value = `${t('raid.raidLog')} - ${project.name}`;
-      titleCell.font = { size: 16, bold: true };
-      titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
-      titleCell.fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FF1890FF' },
-      };
-      titleCell.font = { ...titleCell.font, color: { argb: 'FFFFFFFF' } };
-      worksheet.getRow(1).height = 30;
-
-      // Add statistics
-      worksheet.mergeCells('A2:M2');
-      const statsCell = worksheet.getCell('A2');
-      statsCell.value = `${t('raid.openRisks')}: ${openRisks} | ${t('raid.openIssues')}: ${openIssues} | ${t('raid.assumptions')}: ${assumptions} | ${t('raid.dependencies')}: ${dependencies}`;
-      statsCell.alignment = { horizontal: 'center', vertical: 'middle' };
-      statsCell.fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FFF0F0F0' },
-      };
-      worksheet.getRow(2).height = 25;
-
-      // Add headers
-      const headers = [
-        t('raid.type'),
-        t('raid.title'),
-        t('raid.responsibility'),
-        t('raid.raisedDate'),
-        t('raid.impactDescription'),
-        t('raid.status'),
-        t('common.priority'),
-        t('raid.impact'),
-        t('raid.probability'),
-        t('raid.mitigation'),
-        t('raid.mitigationOwner'),
-        t('raid.closureDueDate'),
-        t('raid.revisedClosureDate'),
-      ];
-
-      worksheet.addRow(headers);
-      const headerRow = worksheet.getRow(3);
-      headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-      headerRow.fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FF4472C4' },
-      };
-      headerRow.alignment = { horizontal: 'center', vertical: 'middle' };
-      headerRow.height = 25;
-
-      // Add data
-      raidItems.forEach((item: any) => {
-        worksheet.addRow([
-          t(`raid.type_${item.type.toLowerCase()}`),
-          item.title,
-          item.owner?.firstName + ' ' + item.owner?.lastName || '-',
-          item.identifiedDate ? dayjs(item.identifiedDate).format('YYYY-MM-DD') : '-',
-          item.impactDescription || '-',
-          t(`raid.status_${item.status.toLowerCase()}`),
-          item.priority ? t(`common.${item.priority.toLowerCase()}`) : '-',
-          item.impact ? t(`raid.impact_${item.impact.toLowerCase()}`) : '-',
-          item.probability ? t(`raid.probability_${item.probability.toLowerCase()}`) : '-',
-          item.mitigation || '-',
-          item.mitigationOwner?.firstName + ' ' + item.mitigationOwner?.lastName || '-',
-          item.targetDate ? dayjs(item.targetDate).format('YYYY-MM-DD') : '-',
-          item.revisedTargetDate ? dayjs(item.revisedTargetDate).format('YYYY-MM-DD') : '-',
-        ]);
-      });
-
-      // Set column widths
-      worksheet.columns = [
-        { width: 15 },  // Type
-        { width: 30 },  // Title
-        { width: 20 },  // Responsibility
-        { width: 15 },  // Raised Date
-        { width: 40 },  // Impact Description
-        { width: 15 },  // Status
-        { width: 12 },  // Priority
-        { width: 15 },  // Impact
-        { width: 15 },  // Probability
-        { width: 40 },  // Mitigation
-        { width: 20 },  // Mitigation Owner
-        { width: 15 },  // Closure Due Date
-        { width: 15 },  // Revised Closure Date
-      ];
-
-      // Add borders to all cells
-      worksheet.eachRow((row, rowNumber) => {
-        if (rowNumber > 2) {
-          row.eachCell((cell) => {
-            cell.border = {
-              top: { style: 'thin' },
-              left: { style: 'thin' },
-              bottom: { style: 'thin' },
-              right: { style: 'thin' },
-            };
-            cell.alignment = { vertical: 'middle', wrapText: true };
-          });
-        }
-      });
-
-      // Generate file
-      const buffer = await workbook.xlsx.writeBuffer();
-      const blob = new Blob([buffer], {
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      });
-      const url = window.URL.createObjectURL(blob);
+      const blob = await api.exportRAIDLog(project.id);
+      const url  = URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.href = url;
+      link.href     = url;
       link.download = `RAID_${project.code}_${dayjs().format('YYYY-MM-DD')}.xlsx`;
+      document.body.appendChild(link);
       link.click();
-      window.URL.revokeObjectURL(url);
-
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
       message.success(t('common.exportSuccess'));
     } catch (error) {
       console.error('Export failed:', error);
@@ -734,11 +783,47 @@ export default function ProjectRAID({ project }: ProjectRAIDProps) {
           </Space>
         }
       >
+        {/* Filter bar */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <Space>
+            <FilterOutlined style={{ color: '#8c8c8c' }} />
+            <Select
+              allowClear
+              placeholder={t('raid.filterByType')}
+              style={{ width: 180 }}
+              value={typeFilter}
+              onChange={(v) => { setTypeFilter(v ?? null); setSelectedRowKeys([]); }}
+            >
+              <Select.Option value="RISK">{t('raid.type_risk')}</Select.Option>
+              <Select.Option value="ISSUE">{t('raid.type_issue')}</Select.Option>
+              <Select.Option value="ASSUMPTION">{t('raid.type_assumption')}</Select.Option>
+              <Select.Option value="DEPENDENCY">{t('raid.type_dependency')}</Select.Option>
+            </Select>
+            {typeFilter && (
+              <Button size="small" onClick={() => { setTypeFilter(null); setSelectedRowKeys([]); }}>
+                {t('common.clearFilter')}
+              </Button>
+            )}
+          </Space>
+          {selectedRowKeys.length > 0 && (
+            <Space>
+              <span style={{ color: '#8c8c8c' }}>{selectedRowKeys.length} {t('raid.itemsSelected')}</span>
+              <Button danger icon={<DeleteOutlined />} onClick={handleBulkDelete}>
+                {t('common.deleteSelected')}
+              </Button>
+            </Space>
+          )}
+        </div>
+
         <Table
-          dataSource={raidItems}
+          dataSource={filteredItems}
           columns={columns}
           rowKey="id"
           loading={isLoading}
+          rowSelection={{
+            selectedRowKeys,
+            onChange: (keys) => setSelectedRowKeys(keys),
+          }}
         />
       </Card>
 

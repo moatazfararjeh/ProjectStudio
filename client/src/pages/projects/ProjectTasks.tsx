@@ -127,44 +127,47 @@ export default function ProjectTasks({ project }: ProjectTasksProps) {
   };
 
   // Filter visible tasks based on expansion state
+  // Tasks are sorted so children always follow their parent (tree order)
   const getVisibleTasks = (allTasks: Task[]): Task[] => {
-    const visible: Task[] = [];
     const taskMap = new Map(allTasks.map(t => [t.id, t]));
-    
+
+    // Build tree-ordered flat list: roots first, then children immediately after parent
+    const buildTreeOrder = (tasks: Task[]): Task[] => {
+      const roots = tasks.filter(t => !t.parentId).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+      const result: Task[] = [];
+      const addWithChildren = (task: Task) => {
+        result.push(task);
+        const children = tasks.filter(t => t.parentId === task.id).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+        for (const child of children) addWithChildren(child);
+      };
+      for (const root of roots) addWithChildren(root);
+      // Include any orphaned tasks (parentId set but parent not found)
+      const included = new Set(result.map(t => t.id));
+      for (const t of tasks) { if (!included.has(t.id)) result.push(t); }
+      return result;
+    };
+
+    const ordered = buildTreeOrder(allTasks);
+
     const isTaskVisible = (task: Task): boolean => {
       if (!task.parentId) return true;
-      
-      let currentParentId = task.parentId;
+      let currentParentId: string | null | undefined = task.parentId;
       while (currentParentId) {
-        if (!expandedTaskIds.has(currentParentId)) {
-          return false;
-        }
+        if (!expandedTaskIds.has(currentParentId)) return false;
         const parent = taskMap.get(currentParentId);
         if (!parent) break;
         currentParentId = parent.parentId;
       }
       return true;
     };
-    
-    for (const task of allTasks) {
-      if (isTaskVisible(task)) {
-        visible.push(task);
-      }
-    }
-    
-    return visible;
+
+    return ordered.filter(isTaskVisible);
   };
 
   // Fetch tasks for this project
   const { data: tasks = [], isLoading } = useQuery({
     queryKey: ['tasks', project.id],
     queryFn: () => api.getTasks({ projectId: project.id }),
-  });
-
-  // Fetch project phases
-  const { data: phases } = useQuery({
-    queryKey: ['phases', project.id],
-    queryFn: () => api.getPhases(project.id),
   });
 
   // Expand all parent tasks by default when tasks load
@@ -244,10 +247,26 @@ export default function ProjectTasks({ project }: ProjectTasksProps) {
 
   const handleEdit = (task: Task) => {
     setEditingTask(task);
+
+    // For tasks with assigneeName (non-portal MPP resource), find the matching member
+    // so the dropdown shows the current assignee
+    let assignedToFormValue: string | undefined = task.assignedToId || undefined;
+    if (!assignedToFormValue && (task as any).assigneeName) {
+      const matchedMember = project.members?.find((m: any) =>
+        !m.user && m.memberName === (task as any).assigneeName
+      );
+      if (matchedMember) assignedToFormValue = matchedMember.id;
+    }
+
     form.setFieldsValue({
       ...task,
-      startDate: task.startDate ? dayjs(task.startDate) : undefined,
-      endDate: task.endDate ? dayjs(task.endDate) : undefined,
+      assignedToId:   assignedToFormValue,
+      startDate:      task.startDate      ? dayjs(task.startDate)      : undefined,
+      endDate:        task.endDate        ? dayjs(task.endDate)        : undefined,
+      baselineStart:  task.baselineStart  ? dayjs(task.baselineStart)  : undefined,
+      baselineFinish: task.baselineFinish ? dayjs(task.baselineFinish) : undefined,
+      actualStart:    task.actualStart    ? dayjs(task.actualStart)    : undefined,
+      actualFinish:   task.actualFinish   ? dayjs(task.actualFinish)   : undefined,
       dependencyIds: task.dependencies?.map((dep: any) => dep.dependsOnId) || [],
       parentId: task.parentId || undefined,
     });
@@ -310,11 +329,35 @@ export default function ProjectTasks({ project }: ProjectTasksProps) {
       setIsSubmitting(true);
       const values = await form.validateFields();
       const { dependencyIds, ...taskFields } = values;
+
+      // Only include assignedToId if it belongs to a real portal user
+      const validUserIds = new Set(
+        project.members?.filter((m: any) => m.user).map((m: any) => m.user.id) || []
+      );
+      let assigneeName: string | null | undefined = undefined; // undefined = leave unchanged
+      if (taskFields.assignedToId && !validUserIds.has(taskFields.assignedToId)) {
+        // Non-portal member selected — store their display name, clear the relation ID
+        const nonPortalMember = project.members?.find(
+          (m: any) => !m.user && m.id === taskFields.assignedToId
+        );
+        assigneeName = (nonPortalMember as any)?.memberName || null;
+        taskFields.assignedToId = undefined;
+      } else if (taskFields.assignedToId) {
+        // Portal user selected — clear any stored assigneeName
+        assigneeName = null;
+      }
+
       const taskData = {
         ...taskFields,
         projectId: project.id,
-        startDate: values.startDate ? values.startDate.toISOString() : null,
-        endDate: values.endDate ? values.endDate.toISOString() : null,
+        ...(assigneeName !== undefined && { assigneeName }),
+        duration: taskFields.duration !== undefined ? Number(taskFields.duration) : undefined,
+        startDate:      values.startDate      ? values.startDate.toISOString()      : undefined,
+        endDate:        values.endDate        ? values.endDate.toISOString()        : undefined,
+        baselineStart:  values.baselineStart  ? values.baselineStart.toISOString()  : null,
+        baselineFinish: values.baselineFinish ? values.baselineFinish.toISOString() : null,
+        actualStart:    values.actualStart    ? values.actualStart.toISOString()    : null,
+        actualFinish:   values.actualFinish   ? values.actualFinish.toISOString()   : null,
       };
 
       if (editingTask) {
@@ -358,6 +401,10 @@ export default function ProjectTasks({ project }: ProjectTasksProps) {
         
         message.success(t('tasks.createSuccess'));
         queryClient.invalidateQueries({ queryKey: ['tasks', project.id] });
+        // Auto-expand parent so the new task is immediately visible
+        if (taskData.parentId) {
+          setExpandedTaskIds(prev => new Set([...prev, taskData.parentId as string]));
+        }
         handleModalClose();
       }
     } catch (error: any) {
@@ -568,7 +615,7 @@ export default function ProjectTasks({ project }: ProjectTasksProps) {
       title: t('tasks.assignee'),
       key: 'assignee',
       width: 170,
-      filters: project.members?.map((member: any) => ({
+      filters: project.members?.filter((member: any) => member.user).map((member: any) => ({
         text: `${member.user.firstName} ${member.user.lastName}`,
         value: member.user.id,
       })) || [],
@@ -588,6 +635,16 @@ export default function ProjectTasks({ project }: ProjectTasksProps) {
               />
               <span style={{ fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {record.assignedTo.firstName} {record.assignedTo.lastName}
+              </span>
+            </div>
+          );
+        }
+        if ((record as any).assigneeName) {
+          return (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Avatar size={26} icon={<UserOutlined />} style={{ backgroundColor: '#8c8c8c', fontSize: 12, flexShrink: 0 }} />
+              <span style={{ fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {(record as any).assigneeName}
               </span>
             </div>
           );
@@ -664,15 +721,48 @@ export default function ProjectTasks({ project }: ProjectTasksProps) {
       },
     },
     {
+      title: 'Baseline',
+      key: 'baseline',
+      width: 160,
+      render: (_: any, record: Task) => {
+        const bStart  = record.baselineStart  ? dayjs(record.baselineStart)  : null;
+        const bFinish = record.baselineFinish ? dayjs(record.baselineFinish) : null;
+        if (!bStart && !bFinish) return <span style={{ color: '#bfbfbf' }}>—</span>;
+        return (
+          <div style={{ fontSize: 11, lineHeight: 1.6, color: '#8c8c8c' }}>
+            <div>{bStart?.format('MMM DD')} → {bFinish?.format('MMM DD, YY')}</div>
+          </div>
+        );
+      },
+    },
+    {
+      title: 'Actual',
+      key: 'actual',
+      width: 160,
+      render: (_: any, record: Task) => {
+        const aStart  = record.actualStart  ? dayjs(record.actualStart)  : null;
+        const aFinish = record.actualFinish ? dayjs(record.actualFinish) : null;
+        if (!aStart && !aFinish) return <span style={{ color: '#bfbfbf' }}>—</span>;
+        return (
+          <div style={{ fontSize: 11, lineHeight: 1.6 }}>
+            <div style={{ color: aFinish && aFinish.isAfter(record.endDate ? dayjs(record.endDate) : dayjs()) ? '#cf1322' : '#389e0d' }}>
+              {aStart?.format('MMM DD')} → {aFinish?.format('MMM DD, YY')}
+            </div>
+          </div>
+        );
+      },
+    },
+    {
       title: 'Deps',
       dataIndex: 'dependencies',
       key: 'dependencies',
       width: 80,
+      fixed: 'right' as const,
       render: (dependencies: any[]) => {
         if (!dependencies || dependencies.length === 0) return <span style={{ color: '#bfbfbf' }}>—</span>;
         return (
           <Tooltip title={dependencies.map((d: any) => d.dependsOn?.name || 'Unknown').join(', ')}>
-            <Tag color="geekblue" style={{ borderRadius: 6 }}>
+            <Tag color="geekblue" style={{ borderRadius: 6, cursor: 'default' }}>
               {dependencies.length} dep{dependencies.length > 1 ? 's' : ''}
             </Tag>
           </Tooltip>
@@ -889,7 +979,7 @@ export default function ProjectTasks({ project }: ProjectTasksProps) {
             dataSource={filteredAndSortedTasks}
             rowKey="id"
             loading={isLoading}
-            scroll={{ x: 1300 }}
+            scroll={{ x: 1600 }}
             pagination={{
               pageSize: 50,
               showSizeChanger: true,
@@ -1118,25 +1208,17 @@ export default function ProjectTasks({ project }: ProjectTasksProps) {
             </Select>
           </Form.Item>
 
-          <Form.Item name="phaseId" label={t('projects.phases')}>
-            <Select allowClear placeholder={t('tasks.selectPhase')}>
-              {phases?.map((phase: any) => (
-                <Select.Option key={phase.id} value={phase.id}>
-                  {phase.name}
-                </Select.Option>
-              ))}
-            </Select>
-          </Form.Item>
-
           <Form.Item
             name="assignedToId"
             label={t('tasks.assignee')}
-            rules={[{ required: true, message: t('common.required') }]}
           >
             <Select placeholder={t('tasks.selectAssignee')}>
               {project.members?.map((member: any) => (
-                <Select.Option key={member.user.id} value={member.user.id}>
-                  {member.user.firstName} {member.user.lastName}
+                <Select.Option
+                  key={member.user ? member.user.id : member.id}
+                  value={member.user ? member.user.id : member.id}
+                >
+                  {member.memberName || `${member.user?.firstName} ${member.user?.lastName}`}
                 </Select.Option>
               ))}
             </Select>
@@ -1176,6 +1258,22 @@ export default function ProjectTasks({ project }: ProjectTasksProps) {
           </Form.Item>
 
           <Form.Item name="endDate" label={t('tasks.endDate')}>
+            <DatePicker style={{ width: '100%' }} />
+          </Form.Item>
+
+          <Form.Item name="baselineStart" label="Baseline Start">
+            <DatePicker style={{ width: '100%' }} />
+          </Form.Item>
+
+          <Form.Item name="baselineFinish" label="Baseline Finish">
+            <DatePicker style={{ width: '100%' }} />
+          </Form.Item>
+
+          <Form.Item name="actualStart" label="Actual Start">
+            <DatePicker style={{ width: '100%' }} />
+          </Form.Item>
+
+          <Form.Item name="actualFinish" label="Actual Finish">
             <DatePicker style={{ width: '100%' }} />
           </Form.Item>
 

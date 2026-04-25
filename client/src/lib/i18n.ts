@@ -47,6 +47,8 @@ const resources = {
         medium: 'Medium',
         high: 'High',
         critical: 'Critical',
+        clearFilter: 'Clear Filter',
+        deleteSelected: 'Delete Selected',
       },
       
       // Auth
@@ -429,6 +431,8 @@ const resources = {
         importPartial: '{{success}} imported, {{fail}} failed',
         importRowError: 'Row {{row}}: {{reason}}',
         importMissingRequired: 'Missing required fields (Type, Title, Description)',
+        filterByType: 'Filter by type',
+        itemsSelected: 'items selected',
       },
       
       // Dashboard
@@ -600,6 +604,8 @@ const resources = {
         medium: 'متوسط',
         high: 'عالي',
         critical: 'حرج',
+        clearFilter: 'مسح الفلتر',
+        deleteSelected: 'حذف المحدد',
       },
       
       // Auth
@@ -937,6 +943,8 @@ const resources = {
         importPartial: 'تم استيراد {{success}}، فشل {{fail}}',
         importRowError: 'الصف {{row}}: {{reason}}',
         importMissingRequired: 'حقول مطلوبة مفقودة (النوع، العنوان، الوصف)',
+        filterByType: 'تصفية حسب النوع',
+        itemsSelected: 'عناصر محددة',
       },
       
       // Reports

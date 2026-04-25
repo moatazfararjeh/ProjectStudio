@@ -7,17 +7,21 @@ import { parseMPPXML, mapPriority, mapStatus, getParentOutlineNumber } from '../
 
 const taskSchema = z.object({
   projectId: z.string(),
-  phaseId: z.string().optional(),
-  parentId: z.string().optional(),
+  parentId: z.string().optional().nullable(),
   name: z.string().min(2),
   description: z.string().optional(),
-  startDate: z.string(),
-  endDate: z.string(),
-  duration: z.number(),
+  startDate: z.string().optional().nullable(),
+  endDate: z.string().optional().nullable(),
+  baselineStart:  z.string().optional().nullable(),
+  baselineFinish: z.string().optional().nullable(),
+  actualStart:    z.string().optional().nullable(),
+  actualFinish:   z.string().optional().nullable(),
+  duration: z.union([z.number(), z.string().transform(v => parseFloat(v) || 1)]).optional().default(1),
   plannedHours: z.number().optional(),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']).optional(),
   status: z.enum(['NOT_STARTED', 'IN_PROGRESS', 'BLOCKED', 'COMPLETED', 'CANCELLED']).optional(),
-  assignedToId: z.string().optional(),
+  assignedToId: z.string().optional().nullable(),
+  assigneeName: z.string().optional().nullable(),
 });
 
 /**
@@ -93,12 +97,11 @@ async function updateParentProgress(taskId: string): Promise<void> {
 
 export const getTasks = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { projectId, phaseId, assignedToId, status } = req.query;
+    const { projectId, assignedToId, status } = req.query;
 
     const tasks = await prisma.task.findMany({
       where: {
         ...(projectId && { projectId: projectId as string }),
-        ...(phaseId && { phaseId: phaseId as string }),
         ...(assignedToId && { assignedToId: assignedToId as string }),
         ...(status && { status: status as any }),
       },
@@ -109,7 +112,6 @@ export const getTasks = async (req: AuthRequest, res: Response, next: NextFuncti
         createdBy: {
           select: { id: true, firstName: true, lastName: true },
         },
-        phase: true,
         parent: {
           select: { id: true, name: true },
         },
@@ -149,7 +151,6 @@ export const getTask = async (req: AuthRequest, res: Response, next: NextFunctio
         createdBy: {
           select: { id: true, firstName: true, lastName: true },
         },
-        phase: true,
         parent: {
           select: { id: true, name: true },
         },
@@ -201,11 +202,25 @@ export const createTask = async (req: AuthRequest, res: Response, next: NextFunc
   try {
     const data = taskSchema.parse(req.body);
 
+    // Determine order: place after the last existing task in the project
+    // (or after the last sibling if parentId is given)
+    const lastTask = await prisma.task.findFirst({
+      where: { projectId: data.projectId },
+      orderBy: { order: 'desc' },
+      select: { order: true },
+    });
+    const nextOrder = (lastTask?.order ?? -1) + 1;
+
     const task = await prisma.task.create({
       data: {
         ...data,
-        startDate: new Date(data.startDate),
-        endDate: new Date(data.endDate),
+        order: nextOrder,
+        startDate:      data.startDate      ? new Date(data.startDate)      : new Date(),
+        endDate:        data.endDate        ? new Date(data.endDate)        : new Date(),
+        baselineStart:  data.baselineStart  ? new Date(data.baselineStart)  : undefined,
+        baselineFinish: data.baselineFinish ? new Date(data.baselineFinish) : undefined,
+        actualStart:    data.actualStart    ? new Date(data.actualStart)    : undefined,
+        actualFinish:   data.actualFinish   ? new Date(data.actualFinish)   : undefined,
         createdById: req.user!.id,
       },
       include: {
@@ -275,8 +290,12 @@ export const updateTask = async (req: AuthRequest, res: Response, next: NextFunc
       where: { id: id as string },
       data: {
         ...data,
-        ...(data.startDate && { startDate: new Date(data.startDate) }),
-        ...(data.endDate && { endDate: new Date(data.endDate) }),
+        ...(data.startDate      && { startDate:      new Date(data.startDate) }),
+        ...(data.endDate        && { endDate:        new Date(data.endDate) }),
+        ...(data.baselineStart  !== undefined && { baselineStart:  data.baselineStart  ? new Date(data.baselineStart)  : null }),
+        ...(data.baselineFinish !== undefined && { baselineFinish: data.baselineFinish ? new Date(data.baselineFinish) : null }),
+        ...(data.actualStart    !== undefined && { actualStart:    data.actualStart    ? new Date(data.actualStart)    : null }),
+        ...(data.actualFinish   !== undefined && { actualFinish:   data.actualFinish   ? new Date(data.actualFinish)   : null }),
       },
       include: {
         assignedTo: {
@@ -422,6 +441,16 @@ export const importMPP = async (req: AuthRequest, res: Response, next: NextFunct
     const projectSettings = project.settings as any;
     const hoursPerDay = projectSettings?.hoursPerDay || 8;
 
+    // Delete existing tasks for this project before re-importing
+    // (delete dependencies first due to FK constraints)
+    await prisma.taskDependency.deleteMany({
+      where: { task: { projectId } },
+    });
+    await prisma.task.deleteMany({
+      where: { projectId },
+    });
+    console.log(`[MPP Import] Cleared existing tasks for project ${projectId}`);
+
     // Read and parse the file
     const fileContent = req.file.buffer.toString('utf-8');
     const parsedData = await parseMPPXML(fileContent, hoursPerDay);
@@ -456,12 +485,18 @@ export const importMPP = async (req: AuthRequest, res: Response, next: NextFunct
     for (const resource of parsedData.resources) {
       // Try to match by email first (most reliable)
       let matchedUser = projectMembers.find(
-        member => member.user.email.toLowerCase() === resource.email?.toLowerCase()
+        member => member.user && member.user.email.toLowerCase() === resource.email?.toLowerCase()
       );
 
       // If no email match, try matching by name
       if (!matchedUser && resource.name) {
         matchedUser = projectMembers.find(member => {
+          if (!member.user) {
+            // For non-portal members, match by memberName
+            const memberName = (member.memberName || '').toLowerCase();
+            const resourceName = resource.name.toLowerCase();
+            return memberName === resourceName;
+          }
           const fullName = `${member.user.firstName} ${member.user.lastName}`.toLowerCase();
           const resourceName = resource.name.toLowerCase();
           return fullName === resourceName || 
@@ -471,21 +506,32 @@ export const importMPP = async (req: AuthRequest, res: Response, next: NextFunct
       }
 
       if (matchedUser) {
-        resourceUidToUserIdMap.set(resource.uid, matchedUser.user.id);
+        resourceUidToUserIdMap.set(resource.uid, matchedUser.user?.id || matchedUser.id);
       } else {
         unmatchedResources.push(resource.name);
       }
     }
 
     // Build task UID to assignee mapping based on assignments
+    // Map resource UID to resource name (for unmatched resources)
+    const resourceUidToNameMap = new Map<string, string>();
+    for (const resource of parsedData.resources) {
+      if (resource.name) resourceUidToNameMap.set(resource.uid, resource.name);
+    }
+
     const taskUidToAssigneeMap = new Map<string, string>();
+    const taskUidToAssigneeNameMap = new Map<string, string>();
     for (const assignment of parsedData.assignments) {
       const userId = resourceUidToUserIdMap.get(assignment.resourceUid);
       if (userId) {
-        // If multiple resources assigned, take the first one
-        // (EPM supports single assignee per task)
         if (!taskUidToAssigneeMap.has(assignment.taskUid)) {
           taskUidToAssigneeMap.set(assignment.taskUid, userId);
+        }
+      } else {
+        // No portal user match — store the resource name
+        const resourceName = resourceUidToNameMap.get(assignment.resourceUid);
+        if (resourceName && !taskUidToAssigneeNameMap.has(assignment.taskUid)) {
+          taskUidToAssigneeNameMap.set(assignment.taskUid, resourceName);
         }
       }
     }
@@ -531,7 +577,8 @@ export const importMPP = async (req: AuthRequest, res: Response, next: NextFunct
 
       // Get assignee from mapping
       const assignedToId = taskUidToAssigneeMap.get(parsedTask.uid);
-      console.log(`  Assigned To: ${assignedToId || 'Unassigned'}`);
+      const assigneeName = !assignedToId ? (taskUidToAssigneeNameMap.get(parsedTask.uid) || undefined) : undefined;
+      console.log(`  Assigned To: ${assignedToId || assigneeName || 'Unassigned'}`);
 
       const task = await prisma.task.create({
         data: {
@@ -540,6 +587,10 @@ export const importMPP = async (req: AuthRequest, res: Response, next: NextFunct
           description: parsedTask.notes || undefined,
           startDate: new Date(parsedTask.start),
           endDate: new Date(parsedTask.finish),
+          actualStart:    parsedTask.actualStart   ? new Date(parsedTask.actualStart)   : undefined,
+          actualFinish:   parsedTask.actualFinish  ? new Date(parsedTask.actualFinish)  : undefined,
+          baselineStart:  parsedTask.baselineStart ? new Date(parsedTask.baselineStart) : undefined,
+          baselineFinish: parsedTask.baselineFinish? new Date(parsedTask.baselineFinish): undefined,
           duration: parsedTask.duration || 1,
           plannedHours: (parsedTask.duration || 1) * hoursPerDay,
           priority: mapPriority(parsedTask.priority),
@@ -548,6 +599,7 @@ export const importMPP = async (req: AuthRequest, res: Response, next: NextFunct
           createdById: userId,
           parentId, // Set parent based on outline number
           assignedToId, // Set assignee from resource mapping
+          assigneeName, // Store resource name when no portal user matched
           order: taskOrder, // Use sequential order from hierarchically sorted tasks
         },
       });

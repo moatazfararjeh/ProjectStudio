@@ -1,9 +1,3 @@
-// Stub handler for project phases
-import { Request, Response, NextFunction } from 'express';
-export const getProjectPhases = async (req: Request, res: Response, next: NextFunction) => {
-  // TODO: Implement actual phases logic
-  res.json([]);
-};
 import { Response, NextFunction } from 'express';
 import { z } from 'zod';
 import prisma from '../config/prisma';
@@ -80,16 +74,7 @@ export const getProject = async (req: AuthRequest, res: Response, next: NextFunc
         account: {
           select: { id: true, name: true, code: true },
         },
-        members: {
-          include: {
-            user: {
-              select: { id: true, firstName: true, lastName: true, avatar: true, email: true },
-            },
-          },
-        },
-        phases: {
-          orderBy: { order: 'asc' },
-        },
+        members: true,
         _count: {
           select: { tasks: true, worklogs: true, raidItems: true },
         },
@@ -190,19 +175,19 @@ export const deleteProject = async (req: AuthRequest, res: Response, next: NextF
 export const addMember = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const { userId, role, allocation } = req.body;
+    const { memberName, memberEmail, role, allocation } = req.body;
+
+    if (!memberName) {
+      throw new AppError('Member name is required', 400);
+    }
 
     const member = await prisma.projectMember.create({
       data: {
         projectId: id as string,
-        userId,
+        memberName,
+        memberEmail: memberEmail || null,
         role,
         allocation: allocation || 100,
-      },
-      include: {
-        user: {
-          select: { id: true, firstName: true, lastName: true, avatar: true, email: true },
-        },
       },
     });
 

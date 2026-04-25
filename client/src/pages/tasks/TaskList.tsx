@@ -112,7 +112,7 @@ export default function TaskList() {
   });
 
   // Get available assignees (project members only)
-  const availableAssignees = selectedProjectDetails?.members?.map((member: any) => ({
+  const availableAssignees = selectedProjectDetails?.members?.filter((member: any) => member.user).map((member: any) => ({
     label: `${member.user.firstName} ${member.user.lastName}`,
     value: member.user.id,
   })) || [];
@@ -514,13 +514,6 @@ export default function TaskList() {
                   options={availableAssignees}
                   notFoundContent={formProjectId ? 'No team members in this project' : 'Select a project first'}
                 />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item name="phaseId" label={t('tasks.phase')}>
-                <Select placeholder={t('tasks.selectPhase')} allowClear>
-                  {/* Phases will be loaded based on project */}
-                </Select>
               </Form.Item>
             </Col>
           </Row>

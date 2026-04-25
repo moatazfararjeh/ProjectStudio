@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { Card, Typography, Button, Table, Tag, Space, Modal, Form, Input, DatePicker, Select, InputNumber, App } from 'antd';
 import { PlusOutlined, EditOutlined, EyeOutlined, UserOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
+import { api } from '../../lib/api';
 
 const { Title } = Typography;
 const { TextArea } = Input;
@@ -35,70 +36,31 @@ export default function AccountList() {
   const [form] = Form.useForm();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
+  const queryClient = useQueryClient();
 
-  // Fetch accounts - مؤقتاً نستخدم بيانات وهمية حتى يتم إنشاء API
   const { data: accounts, isLoading } = useQuery({
     queryKey: ['accounts'],
-    queryFn: async () => {
-      // TODO: Replace with actual API call
-      // return await api.getAccounts();
-      
-      // Mock data for now
-      return [
-        {
-          id: '1',
-          name: 'شركة النجاح التقني',
-          code: 'ACC-2026-001',
-          industry: 'Technology',
-          size: 'Large',
-          status: 'ACTIVE',
-          healthScore: 85,
-          renewalProbability: 90,
-          annualValue: 500000,
-          lifetimeValue: 1200000,
-          primaryContact: 'أحمد محمد',
-          primaryContactEmail: 'ahmad@success-tech.com',
-          primaryContactPhone: '+966501234567',
-          contractEndDate: '2026-12-31',
-          nextReviewDate: '2026-12-01',
-          createdAt: '2024-01-15',
-        },
-        {
-          id: '2',
-          name: 'مؤسسة التميز للتجارة',
-          code: 'ACC-2026-002',
-          industry: 'Retail',
-          size: 'Medium',
-          status: 'ACTIVE',
-          healthScore: 72,
-          renewalProbability: 75,
-          annualValue: 200000,
-          lifetimeValue: 450000,
-          primaryContact: 'فاطمة أحمد',
-          primaryContactEmail: 'fatima@excellence.com',
-          contractEndDate: '2027-03-31',
-          nextReviewDate: '2026-11-15',
-          createdAt: '2024-06-20',
-        },
-        {
-          id: '3',
-          name: 'شركة الأمل الطبية',
-          code: 'ACC-2025-015',
-          industry: 'Healthcare',
-          size: 'Enterprise',
-          status: 'AT_RISK',
-          healthScore: 45,
-          renewalProbability: 40,
-          annualValue: 800000,
-          lifetimeValue: 2500000,
-          primaryContact: 'د. خالد عبدالله',
-          primaryContactEmail: 'khalid@amal-medical.com',
-          contractEndDate: '2026-06-30',
-          nextReviewDate: '2026-04-01',
-          createdAt: '2023-07-01',
-        },
-      ] as Account[];
+    queryFn: () => api.getAccounts(),
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (data: Partial<Account>) => api.createAccount(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['accounts'] });
+      message.success(t('accounts.createSuccess'));
+      handleModalClose();
     },
+    onError: () => message.error(t('accounts.createError', 'Failed to create account')),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<Account> }) => api.updateAccount(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['accounts'] });
+      message.success(t('accounts.updateSuccess'));
+      handleModalClose();
+    },
+    onError: () => message.error(t('accounts.updateError', 'Failed to update account')),
   });
 
   const handleModalClose = () => {
@@ -126,10 +88,18 @@ export default function AccountList() {
 
   const handleSubmit = async () => {
     try {
-      await form.validateFields();
-      // TODO: Implement create/update mutation
-      message.success(editingAccount ? t('accounts.updateSuccess') : t('accounts.createSuccess'));
-      handleModalClose();
+      const values = await form.validateFields();
+      const payload = {
+        ...values,
+        contractStartDate: values.contractStartDate ? values.contractStartDate.toISOString() : undefined,
+        contractEndDate: values.contractEndDate ? values.contractEndDate.toISOString() : undefined,
+        nextReviewDate: values.nextReviewDate ? values.nextReviewDate.toISOString() : undefined,
+      };
+      if (editingAccount) {
+        updateMutation.mutate({ id: editingAccount.id, data: payload });
+      } else {
+        createMutation.mutate(payload);
+      }
     } catch (error) {
       console.error('Validation failed:', error);
     }
@@ -303,6 +273,7 @@ export default function AccountList() {
         open={isModalOpen}
         onOk={handleSubmit}
         onCancel={handleModalClose}
+        okButtonProps={{ loading: createMutation.isPending || updateMutation.isPending }}
         width={800}
       >
         <Form

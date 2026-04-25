@@ -270,7 +270,6 @@ export const generateMonthlyReport = async (req: AuthRequest, res: Response, nex
         tasks: true,
         worklogs: true,
         raidItems: true,
-        phases: true,
       },
     });
 
@@ -279,7 +278,6 @@ export const generateMonthlyReport = async (req: AuthRequest, res: Response, nex
     }
 
     // Calculate comprehensive metrics
-    const milestones = project.phases.filter(p => p.status === 'COMPLETED');
     const totalBudget = project.budget || project.price;
     const totalSpent = 0; // Would calculate from rate cards + worklogs
 
@@ -291,10 +289,8 @@ export const generateMonthlyReport = async (req: AuthRequest, res: Response, nex
         progress: project.progress,
       },
       milestones: {
-        achieved: milestones.map(m => ({ name: m.name, completedDate: m.updatedAt })),
-        upcoming: project.phases
-          .filter(p => p.status !== 'COMPLETED')
-          .map(m => ({ name: m.name, targetDate: m.endDate })),
+        achieved: [],
+        upcoming: [],
       },
       kpis: {
         scheduleVariance: 0, // Calculate based on baseline

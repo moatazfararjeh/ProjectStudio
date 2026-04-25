@@ -58,6 +58,8 @@ export default function ProjectDashboard({ project }: ProjectDashboardProps) {
   // Count active (non-closed) risks and issues
   const activeRisks = raidItems.filter((item: any) => item.type === 'RISK' && item.status !== 'CLOSED').length;
   const activeIssues = raidItems.filter((item: any) => item.type === 'ISSUE' && item.status !== 'CLOSED').length;
+  const activeAssumptions = raidItems.filter((item: any) => item.type === 'ASSUMPTION').length;
+  const activeDependencies = raidItems.filter((item: any) => item.type === 'DEPENDENCY').length;
 
   // Upcoming & Overdue
   const today    = dayjs().startOf('day');
@@ -226,6 +228,28 @@ export default function ProjectDashboard({ project }: ProjectDashboardProps) {
                       <div>
                         <Text type="secondary">{t('raid.issues')}</Text>
                         <Title level={4} style={{ margin: 0, color: activeIssues > 0 ? '#faad14' : '#8c8c8c' }}>{activeIssues}</Title>
+                      </div>
+                    </Space>
+                  </Card>
+                </Col>
+                <Col span={12}>
+                  <Card size="small" style={{ backgroundColor: '#e6fffb' }}>
+                    <Space>
+                      <CheckCircleOutlined style={{ fontSize: 20, color: '#13c2c2' }} />
+                      <div>
+                        <Text type="secondary">{t('raid.assumptions')}</Text>
+                        <Title level={4} style={{ margin: 0, color: '#13c2c2' }}>{activeAssumptions}</Title>
+                      </div>
+                    </Space>
+                  </Card>
+                </Col>
+                <Col span={12}>
+                  <Card size="small" style={{ backgroundColor: '#fff7e6' }}>
+                    <Space>
+                      <CheckCircleOutlined style={{ fontSize: 20, color: '#fa8c16' }} />
+                      <div>
+                        <Text type="secondary">{t('raid.dependencies')}</Text>
+                        <Title level={4} style={{ margin: 0, color: '#fa8c16' }}>{activeDependencies}</Title>
                       </div>
                     </Space>
                   </Card>

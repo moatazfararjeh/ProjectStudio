@@ -141,7 +141,6 @@ class ApiClient {
   // Tasks
   async getTasks(params?: {
     projectId?: string;
-    phaseId?: string;
     assignedToId?: string;
     status?: string;
   }) {
@@ -250,6 +249,14 @@ class ApiClient {
     await this.client.delete(`/raid/${id}`);
   }
 
+  async exportRAIDLog(projectId: string): Promise<Blob> {
+    const response = await this.client.get('/raid/export', {
+      params: { projectId },
+      responseType: 'blob',
+    });
+    return response.data;
+  }
+
   // Rate Cards
   async getRateCards(params?: { userId?: string; role?: string; active?: boolean }) {
     const { data } = await this.client.get<ApiResponse<{ rateCards: any[] }>>('/rate-cards', {
@@ -294,17 +301,6 @@ class ApiClient {
   async generateMonthlyReport(reportData: { projectId: string; period: string }) {
     const { data } = await this.client.post<ApiResponse<{ report: any }>>('/reports/monthly', reportData);
     return data.data!.report;
-  }
-
-  // Phases
-  async getPhases(projectId: string) {
-    const { data } = await this.client.get<ApiResponse<{ phases: any[] }>>(`/projects/${projectId}/phases`);
-    return data.data!.phases;
-  }
-
-  async createPhase(projectId: string, phaseData: any) {
-    const { data } = await this.client.post<ApiResponse<{ phase: any }>>(`/projects/${projectId}/phases`, phaseData);
-    return data.data!.phase;
   }
 
   // Settings

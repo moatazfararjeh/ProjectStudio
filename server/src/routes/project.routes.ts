@@ -20,10 +20,6 @@ router.get('/', getProjects);
 router.get('/my-projects', getMyProjects);
 router.post('/', createProject);
 router.get('/:id', getProject);
-
-// Stub: Project Phases endpoint (returns empty array)
-import { getProjectPhases } from '../controllers/project.controller';
-router.get('/:id/phases', getProjectPhases);
 router.put('/:id', updateProject);
 router.delete('/:id', deleteProject);
 

@@ -43,7 +43,6 @@ export interface Project {
   managerId: string;
   manager?: User;
   members?: ProjectMember[];
-  phases?: Phase[];
   settings?: ProjectSettings;
   createdAt: string;
   updatedAt: string;
@@ -85,8 +84,6 @@ export interface ProjectSettings {
 export interface Task {
   id: string;
   projectId: string;
-  phaseId?: string;
-  phase?: Phase;
   parentId?: string;
   parent?: Task;
   name: string;
@@ -96,6 +93,10 @@ export interface Task {
   duration: number;
   plannedHours?: number;
   actualHours: number;
+  baselineStart?: string | null;
+  baselineFinish?: string | null;
+  actualStart?: string | null;
+  actualFinish?: string | null;
   priority: TaskPriority;
   status: TaskStatus;
   progress: number;
@@ -147,28 +148,6 @@ export enum DependencyType {
   SS = 'SS',
   FF = 'FF',
   SF = 'SF',
-}
-
-// Phase Types
-export interface Phase {
-  id: string;
-  projectId: string;
-  name: string;
-  description?: string;
-  order: number;
-  startDate: string;
-  endDate: string;
-  status: PhaseStatus;
-  createdAt: string;
-  updatedAt: string;
-  tasks?: Task[];
-}
-
-export enum PhaseStatus {
-  NOT_STARTED = 'NOT_STARTED',
-  IN_PROGRESS = 'IN_PROGRESS',
-  COMPLETED = 'COMPLETED',
-  CANCELLED = 'CANCELLED',
 }
 
 // Worklog Types

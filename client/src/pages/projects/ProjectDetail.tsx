@@ -51,9 +51,7 @@ export default function ProjectDetail() {
   const queryClient = useQueryClient();
   const { message, modal } = App.useApp();
   const [form] = Form.useForm();
-  const [phaseForm] = Form.useForm();
   const [isMemberModalOpen, setIsMemberModalOpen] = useState(false);
-  const [isPhaseModalOpen, setIsPhaseModalOpen] = useState(false);
 
   // Fetch project details
   const { data: project, isLoading } = useQuery({
@@ -95,39 +93,10 @@ export default function ProjectDetail() {
     },
   });
 
-  // Add phase mutation
-  const addPhaseMutation = useMutation({
-    mutationFn: (data: any) => api.createPhase(id!, data),
-    onSuccess: () => {
-      message.success(t('projects.phaseAdded'));
-      queryClient.invalidateQueries({ queryKey: ['project', id] });
-      setIsPhaseModalOpen(false);
-      phaseForm.resetFields();
-    },
-    onError: (error: any) => {
-      message.error(error?.response?.data?.message || t('common.error'));
-    },
-  });
-
   const handleAddMember = async () => {
     try {
       const values = await form.validateFields();
       addMemberMutation.mutate(values);
-    } catch (error) {
-      console.error('Validation failed:', error);
-    }
-  };
-
-  const handleAddPhase = async () => {
-    try {
-      const values = await phaseForm.validateFields();
-      const phaseData = {
-        ...values,
-        startDate: values.dates[0].toISOString(),
-        endDate: values.dates[1].toISOString(),
-      };
-      delete phaseData.dates;
-      addPhaseMutation.mutate(phaseData);
     } catch (error) {
       console.error('Validation failed:', error);
     }
@@ -210,25 +179,6 @@ export default function ProjectDetail() {
           {t('common.remove')}
         </Button>
       ),
-    },
-  ];
-
-  const phaseColumns = [
-    {
-      title: t('projects.phaseName'),
-      dataIndex: 'name',
-      key: 'name',
-    },
-    {
-      title: t('projects.phaseOrder'),
-      dataIndex: 'order',
-      key: 'order',
-    },
-    {
-      title: t('projects.dates'),
-      key: 'dates',
-      render: (_: any, record: any) =>
-        `${dayjs(record.startDate).format('YYYY-MM-DD')} - ${dayjs(record.endDate).format('YYYY-MM-DD')}`,
     },
   ];
 
@@ -374,27 +324,6 @@ export default function ProjectDetail() {
           </Card>
         </TabPane>
 
-        <TabPane tab={t('projects.phases')} key="phases">
-          <Card
-            extra={
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                onClick={() => setIsPhaseModalOpen(true)}
-              >
-                {t('projects.addPhase')}
-              </Button>
-            }
-          >
-            {project.phases && project.phases.length > 0 ? (
-              <Table columns={phaseColumns} dataSource={project.phases} rowKey="id" pagination={false} />
-            ) : (
-              <p style={{ textAlign: 'center', padding: '40px 0', color: '#999' }}>
-                {t('projects.noPhases')}
-              </p>
-            )}
-          </Card>
-        </TabPane>
       </Tabs>
 
       {/* Add Member Modal */}
@@ -440,41 +369,6 @@ export default function ProjectDetail() {
         </Form>
       </Modal>
 
-      {/* Add Phase Modal */}
-      <Modal
-        title={t('projects.addPhase')}
-        open={isPhaseModalOpen}
-        onOk={handleAddPhase}
-        onCancel={() => {
-          setIsPhaseModalOpen(false);
-          phaseForm.resetFields();
-        }}
-        confirmLoading={addPhaseMutation.isPending}
-      >
-        <Form form={phaseForm} layout="vertical">
-          <Form.Item
-            name="name"
-            label={t('projects.phaseName')}
-            rules={[{ required: true, message: t('common.required') }]}
-          >
-            <Input />
-          </Form.Item>
-          <Form.Item
-            name="order"
-            label={t('projects.phaseOrder')}
-            rules={[{ required: true, message: t('common.required') }]}
-          >
-            <InputNumber min={1} style={{ width: '100%' }} />
-          </Form.Item>
-          <Form.Item
-            name="dates"
-            label={t('projects.dates')}
-            rules={[{ required: true, message: t('common.required') }]}
-          >
-            <RangePicker style={{ width: '100%' }} />
-          </Form.Item>
-        </Form>
-      </Modal>
     </div>
   );
 }

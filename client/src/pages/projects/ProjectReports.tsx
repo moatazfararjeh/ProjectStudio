@@ -308,10 +308,10 @@ export default function ProjectReports({ project }: ProjectReportsProps) {
           <Title level={4} style={{ marginBottom: 12 }}>{t('projects.team')}</Title>
           <Card style={{ marginBottom: 24, borderRadius: 12 }}>
             <Space direction="vertical" style={{ width: '100%' }}>
-              {project.members?.map((member: any) => (
+              {project.members?.filter((member: any) => member.user || member.memberName).map((member: any) => (
                 <div key={member.id}>
                   <Text>
-                    <strong>{member.user.firstName} {member.user.lastName}</strong> — {t(`projects.role_${member.role.toLowerCase()}`)}
+                    <strong>{member.memberName || `${member.user?.firstName} ${member.user?.lastName}`}</strong> — {t(`projects.role_${member.role.toLowerCase()}`)}
                   </Text>
                 </div>
               ))}

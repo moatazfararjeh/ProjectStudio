@@ -12,7 +12,6 @@ import api from '../../lib/api';
 import ProjectDashboard from './ProjectDashboard';
 import ProjectTasks from './ProjectTasks';
 import ProjectTeam from './ProjectTeam';
-import ProjectPhases from './ProjectPhases';
 import ProjectReports from './ProjectReports';
 import ProjectRAID from './ProjectRAID';
 import ReportTemplateSettings from './ReportTemplateSettings';
@@ -71,8 +70,6 @@ export default function ProjectDetail() {
         return <ProjectTasks project={project} />;
       case 'team':
         return <ProjectTeam project={project} />;
-      case 'phases':
-        return <ProjectPhases project={project} />;
       case 'reports':
         return <ProjectReports project={project} />;
       case 'saved-reports':

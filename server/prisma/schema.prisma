@@ -95,7 +95,6 @@ model Project {
   
   // Relations
   members     ProjectMember[]
-  phases      Phase[]
   tasks       Task[]
   worklogs    Worklog[]
   raidItems   RAIDItem[]
@@ -118,8 +117,11 @@ model ProjectMember {
   projectId    String
   project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   
-  userId       String
-  user         User     @relation(fields: [userId], references: [id])
+  userId       String?
+  user         User?    @relation(fields: [userId], references: [id])
+
+  memberName   String?  // Name for non-portal members
+  memberEmail  String?  // Email for non-portal members
   
   role         String   // "Developer", "Designer", "QA", etc.
   allocation   Float    @default(100)  // % of time allocated
@@ -127,7 +129,6 @@ model ProjectMember {
   joinedAt     DateTime @default(now())
   leftAt       DateTime?
   
-  @@unique([projectId, userId])
   @@map("project_members")
 }
 
@@ -135,43 +136,10 @@ model ProjectMember {
 // 3. WORK BREAKDOWN STRUCTURE (WBS)
 // ============================================
 
-model Phase {
-  id          String   @id @default(uuid())
-  projectId   String
-  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  
-  name        String
-  description String?
-  order       Int
-  
-  startDate   DateTime
-  endDate     DateTime
-  
-  status      PhaseStatus @default(NOT_STARTED)
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  // Relations
-  tasks       Task[]
-  
-  @@map("phases")
-}
-
-enum PhaseStatus {
-  NOT_STARTED
-  IN_PROGRESS
-  COMPLETED
-  CANCELLED
-}
-
 model Task {
   id          String   @id @default(uuid())
   projectId   String
   project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  
-  phaseId     String?
-  phase       Phase?   @relation(fields: [phaseId], references: [id], onDelete: SetNull)
   
   parentId    String?
   parent      Task?    @relation("TaskSubtasks", fields: [parentId], references: [id], onDelete: Cascade)
@@ -180,10 +148,15 @@ model Task {
   name        String
   description String?
   
-  startDate   DateTime
-  endDate     DateTime
-  duration    Float    // days
-  
+  startDate        DateTime
+  endDate          DateTime
+  duration         Float    // days
+
+  baselineStart    DateTime?
+  baselineFinish   DateTime?
+  actualStart      DateTime?
+  actualFinish     DateTime?
+
   plannedHours Float?
   actualHours  Float   @default(0)
   
@@ -197,6 +170,7 @@ model Task {
   
   assignedToId String?
   assignedTo   User?   @relation("TaskAssignee", fields: [assignedToId], references: [id])
+  assigneeName String? // Name for unmatched MPP resources
   
   order       Int     @default(0)
   

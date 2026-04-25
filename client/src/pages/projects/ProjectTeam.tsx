@@ -1,7 +1,7 @@
 import RightDrawer from '../../components/RightDrawer';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Card,
   Table,
@@ -10,16 +10,14 @@ import {
   Tag,
   Form,
   Select,
+  Input,
   App,
-  Alert,
-  Spin,
 } from 'antd';
 import {
   PlusOutlined,
   DeleteOutlined,
   UserOutlined,
   EditOutlined,
-  WarningOutlined,
 } from '@ant-design/icons';
 import api from '../../lib/api';
 import type { Project } from '../../types';
@@ -38,20 +36,9 @@ export default function ProjectTeam({ project }: ProjectTeamProps) {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState<any>(null);
 
-  // Fetch all users
-  const { data: users = [], isLoading: isLoadingUsers, error: usersError } = useQuery({
-    queryKey: ['users'],
-    queryFn: () => api.getUsers(),
-  });
-
-  // Filter out users already in the project
-  const availableUsers = users.filter((user: any) => 
-    !project.members?.some((member: any) => member.user.id === user.id)
-  );
-
   // Add member mutation
   const addMemberMutation = useMutation({
-    mutationFn: (data: { userId: string; role: string }) =>
+    mutationFn: (data: { memberName: string; memberEmail?: string; role: string }) =>
       api.addProjectMember(project.id, data),
     onSuccess: () => {
       message.success(t('projects.memberAdded'));
@@ -130,19 +117,19 @@ export default function ProjectTeam({ project }: ProjectTeamProps) {
   const columns = [
     {
       title: t('projects.memberName'),
-      dataIndex: ['user', 'firstName'],
       key: 'name',
       render: (_: any, record: any) => (
         <Space>
           <UserOutlined />
-          {record.user.firstName} {record.user.lastName}
+          {record.memberName || (record.user ? `${record.user.firstName} ${record.user.lastName}` : '—')}
         </Space>
       ),
     },
     {
       title: t('projects.memberEmail'),
-      dataIndex: ['user', 'email'],
       key: 'email',
+      render: (_: any, record: any) =>
+        record.memberEmail || record.user?.email || '—',
     },
     {
       title: t('projects.memberRole'),
@@ -178,7 +165,7 @@ export default function ProjectTeam({ project }: ProjectTeamProps) {
             type="text"
             danger
             icon={<DeleteOutlined />}
-            onClick={() => handleRemoveMember(record.id, `${record.user.firstName} ${record.user.lastName}`)}
+            onClick={() => handleRemoveMember(record.id, record.memberName || record.user?.firstName || 'member')}
           >
             {t('common.remove')}
           </Button>
@@ -215,62 +202,19 @@ export default function ProjectTeam({ project }: ProjectTeamProps) {
         submitText={t('projects.addMember')}
       >
         <Form form={form} layout="vertical">
-          {isLoadingUsers && (
-            <div style={{ textAlign: 'center', padding: '20px 0' }}>
-              <Spin tip="Loading users..." />
-            </div>
-          )}
-          
-          {usersError && (
-            <Alert
-              message="Error Loading Users"
-              description={`Failed to load users. Please try again. ${(usersError as any)?.message || ''}`}
-              type="error"
-              showIcon
-              style={{ marginBottom: 16 }}
-            />
-          )}
-          
-          {!isLoadingUsers && !usersError && users.length === 0 && (
-            <Alert
-              message="No Users Found"
-              description="There are no users in the system. Please create users first using the Register page or contact your administrator."
-              type="warning"
-              showIcon
-              icon={<WarningOutlined />}
-              style={{ marginBottom: 16 }}
-            />
-          )}
-          
-          {!isLoadingUsers && !usersError && users.length > 0 && availableUsers.length === 0 && (
-            <Alert
-              message="All Users Already Added"
-              description="All available users are already members of this project."
-              type="info"
-              showIcon
-              style={{ marginBottom: 16 }}
-            />
-          )}
-          
           <Form.Item
-            name="userId"
-            label={t('projects.selectUser')}
+            name="memberName"
+            label={t('projects.memberName')}
             rules={[{ required: true, message: t('common.required') }]}
           >
-            <Select
-              showSearch
-              placeholder={t('projects.selectUser')}
-              disabled={isLoadingUsers || availableUsers.length === 0}
-              loading={isLoadingUsers}
-              notFoundContent={isLoadingUsers ? <Spin size="small" /> : 'No users available'}
-              filterOption={(input, option) =>
-                (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-              }
-              options={availableUsers.map((user: any) => ({
-                label: `${user.firstName} ${user.lastName} (${user.email})`,
-                value: user.id,
-              }))}
-            />
+            <Input placeholder="Enter member name" />
+          </Form.Item>
+
+          <Form.Item
+            name="memberEmail"
+            label={t('projects.memberEmail')}
+          >
+            <Input placeholder="Enter email (optional)" type="email" />
           </Form.Item>
 
           <Form.Item

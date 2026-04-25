@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -26,6 +26,7 @@ import {
   LinkOutlined,
   EditOutlined,
   DeleteOutlined,
+  DownloadOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import api from '../../lib/api';
@@ -46,6 +47,30 @@ export default function RAIDLog() {
   const [editingItem, setEditingItem] = useState<RAIDItem | null>(null);
   const [selectedProject, setSelectedProject] = useState<string | undefined>();
   const [activeTab, setActiveTab] = useState<RAIDType>('RISK');
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExport = useCallback(async () => {
+    if (!selectedProject) {
+      message.warning('Please select a project to export');
+      return;
+    }
+    try {
+      setIsExporting(true);
+      const blob = await api.exportRAIDLog(selectedProject);
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href     = url;
+      a.download = `RAID_Log_${Date.now()}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      message.error('Export failed. Please try again.');
+    } finally {
+      setIsExporting(false);
+    }
+  }, [selectedProject, message]);
 
   // Fetch projects for filter
   const { data: projects } = useQuery({
@@ -295,6 +320,15 @@ export default function RAIDLog() {
             }))}
           />
         </Space>
+        <Button
+          icon={<DownloadOutlined />}
+          onClick={handleExport}
+          loading={isExporting}
+          disabled={!selectedProject}
+          title={!selectedProject ? 'Select a project first' : 'Export RAID Log to Excel'}
+        >
+          Export to Excel
+        </Button>
       </div>
 
       {/* Statistics */}

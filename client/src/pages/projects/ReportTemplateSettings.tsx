@@ -21,6 +21,9 @@ import {
   Tooltip,
   Upload,
   Select,
+  Tabs,
+  Badge,
+  Alert,
 } from 'antd';
 import {
   SaveOutlined,
@@ -35,6 +38,9 @@ import {
   DeleteOutlined,
   CloseCircleOutlined,
   PictureOutlined,
+  LayoutOutlined,
+  CheckCircleOutlined,
+  StopOutlined,
 } from '@ant-design/icons';
 import { DndContext, closestCenter } from '@dnd-kit/core';
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
@@ -365,549 +371,90 @@ export default function ReportTemplateSettings({ project }: ReportTemplateSettin
   const currentSlides = template?.slides || DEFAULT_TEMPLATE.slides;
   const enabledCount = Object.values(currentSlides).filter(Boolean).length;
 
-  return (
-    <div>
-      {/* Header */}
-      <Card style={{ marginBottom: 16 }}>
-        <Row justify="space-between" align="middle">
-          <Col>
-            <Space>
-              <FilePptOutlined style={{ fontSize: 24, color: '#0B4F6C' }} />
-              <div>
-                <Title level={4} style={{ margin: 0 }}>
-                  Report Template Settings
-                </Title>
-                <Text type="secondary">
-                  إعدادات قالب التقرير - Customize PowerPoint report output
-                </Text>
-              </div>
-            </Space>
+  // ── Tab: General ─────────────────────────────────────────────────────────
+  const tabGeneral = (
+    <Form form={form} layout="vertical">
+      {/* Company Identity */}
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+          <div style={{ width: 4, height: 20, background: '#0B4F6C', borderRadius: 2 }} />
+          <Text strong style={{ fontSize: 14 }}>هوية الشركة / Company Identity</Text>
+        </div>
+        <Row gutter={16}>
+          <Col span={12}>
+            <Form.Item label="Company Name (English)" name="companyName">
+              <Input placeholder="e.g., Your Company" prefix={<SettingOutlined style={{ color: '#bbb' }} />} />
+            </Form.Item>
           </Col>
-          <Col>
-            <Space>
-              <Button
-                icon={<EyeOutlined />}
-                onClick={handlePreviewExport}
-                loading={isExporting}
-              >
-                Preview Export
-              </Button>
-              <Button
-                icon={<UndoOutlined />}
-                onClick={handleReset}
-              >
-                Reset to Default
-              </Button>
-              <Button
-                type="primary"
-                icon={<SaveOutlined />}
-                onClick={handleSave}
-                loading={saveMutation.isPending}
-              >
-                Save Settings
-              </Button>
-            </Space>
+          <Col span={12}>
+            <Form.Item label="اسم الشركة (عربي)" name="companyNameAr">
+              <Input placeholder="مثال: شركتك" dir="rtl" prefix={<SettingOutlined style={{ color: '#bbb' }} />} />
+            </Form.Item>
           </Col>
         </Row>
-      </Card>
+      </div>
 
-      <Row gutter={16}>
-        {/* LEFT COLUMN: General & Colors */}
-        <Col xs={24} lg={12}>
-          <Collapse
-            defaultActiveKey={['general', 'colors']}
-            style={{ marginBottom: 16 }}
-            items={[
-              {
-                key: 'general',
-                label: (
-                  <Space>
-                    <SettingOutlined />
-                    <span>General Settings / الإعدادات العامة</span>
-                  </Space>
-                ),
-                children: (
-              <Form
-                form={form}
-                layout="vertical"
-                onValuesChange={() => {}}
-              >
-                <Row gutter={16}>
-                  <Col span={12}>
-                    <Form.Item
-                      label="Company Name (English)"
-                      name="companyName"
-                    >
-                      <Input placeholder="e.g., Your Company" />
-                    </Form.Item>
-                  </Col>
-                  <Col span={12}>
-                    <Form.Item
-                      label="اسم الشركة (عربي)"
-                      name="companyNameAr"
-                    >
-                      <Input placeholder="مثال: شركتك" dir="rtl" />
-                    </Form.Item>
-                  </Col>
-                </Row>
+      <Divider style={{ margin: '0 0 20px' }} />
 
-                <Form.Item
-                  label="Left Logo / شعار يسار"
-                  name="logoUrlLeft"
-                >
-                  <Space orientation="vertical" style={{ width: '100%' }}>
-                    <Space>
-                      <Upload
-                        accept="image/*"
-                        showUploadList={false}
-                        customRequest={({ file }) => handleLogoUpload(file as File, 'logoUrlLeft')}
-                        disabled={uploadingLeft}
-                      >
-                        <Button icon={<FileImageOutlined />} loading={uploadingLeft}>
-                          رفع شعار يسار
-                        </Button>
-                      </Upload>
-                      {(template?.logoUrlLeft || form.getFieldValue('logoUrlLeft')) && (
-                        <Button
-                          danger
-                          icon={<DeleteOutlined />}
-                          onClick={() => handleLogoDelete('logoUrlLeft')}
-                        >
-                          حذف الشعار
-                        </Button>
-                      )}
-                    </Space>
-                    {(template?.logoUrlLeft || form.getFieldValue('logoUrlLeft')) && (
-                      <div style={{ marginTop: 4, padding: 8, border: '1px solid #d9d9d9', borderRadius: 4, background: '#fafafa', display: 'inline-block' }}>
-                        <img
-                          src={`http://localhost:5000${template?.logoUrlLeft || form.getFieldValue('logoUrlLeft')}`}
-                          alt="Left Logo"
-                          style={{ maxHeight: 48, maxWidth: 120 }}
-                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                        />
-                      </div>
-                    )}
-                  </Space>
-                </Form.Item>
-                <Form.Item
-                  label="Right Logo / شعار يمين"
-                  name="logoUrlRight"
-                >
-                  <Space orientation="vertical" style={{ width: '100%' }}>
-                    <Space>
-                      <Upload
-                        accept="image/*"
-                        showUploadList={false}
-                        customRequest={({ file }) => handleLogoUpload(file as File, 'logoUrlRight')}
-                        disabled={uploadingRight}
-                      >
-                        <Button icon={<FileImageOutlined />} loading={uploadingRight}>
-                          رفع شعار يمين
-                        </Button>
-                      </Upload>
-                      {(template?.logoUrlRight || form.getFieldValue('logoUrlRight')) && (
-                        <Button
-                          danger
-                          icon={<DeleteOutlined />}
-                          onClick={() => handleLogoDelete('logoUrlRight')}
-                        >
-                          حذف الشعار
-                        </Button>
-                      )}
-                    </Space>
-                    {(template?.logoUrlRight || form.getFieldValue('logoUrlRight')) && (
-                      <div style={{ marginTop: 4, padding: 8, border: '1px solid #d9d9d9', borderRadius: 4, background: '#fafafa', display: 'inline-block' }}>
-                        <img
-                          src={`http://localhost:5000${template?.logoUrlRight || form.getFieldValue('logoUrlRight')}`}
-                          alt="Right Logo"
-                          style={{ maxHeight: 48, maxWidth: 120 }}
-                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                        />
-                      </div>
-                    )}
-                  </Space>
-                </Form.Item>
-
-                <Divider />
-
-                <Form.Item
-                  label="Logo Display / عرض الشعار"
-                  name="logoRepeat"
-                  initialValue={template?.logoRepeat || 'first'}
-                >
-                  <Radio.Group
-                    onChange={(e) => saveMutation.mutate({ logoRepeat: e.target.value })}
-                  >
-                    <Radio.Button value="first">الصفحة الأولى فقط / First Page Only</Radio.Button>
-                    <Radio.Button value="all">جميع الشرائح / All Slides</Radio.Button>
-                  </Radio.Group>
-                </Form.Item>
-
-                <Form.Item
-                  label="Report Language / لغة التقرير"
-                  name="language"
-                >
-                  <Radio.Group>
-                    <Radio.Button value="ar">العربية</Radio.Button>
-                    <Radio.Button value="en">English</Radio.Button>
-                    <Radio.Button value="bilingual">Bilingual / ثنائي اللغة</Radio.Button>
-                  </Radio.Group>
-                </Form.Item>
-
-                <Divider />
-
-                <Row gutter={16}>
-                  <Col span={12}>
-                    <Form.Item
-                      label="Show Variance Indicator / مؤشر التباين"
-                      name="showVarianceIndicator"
-                      valuePropName="checked"
-                    >
-                      <Switch />
-                    </Form.Item>
-                  </Col>
-                  <Col span={12}>
-                    <Form.Item
-                      label="Show Progress Bars / أشرطة التقدم"
-                      name="showProgressBars"
-                      valuePropName="checked"
-                    >
-                      <Switch />
-                    </Form.Item>
-                  </Col>
-                </Row>
-
-                <Row gutter={16}>
-                  <Col span={8}>
-                    <Form.Item
-                      label="Milestones Per Page"
-                      name="milestonesPerPage"
-                    >
-                      <InputNumber min={5} max={20} style={{ width: '100%' }} />
-                    </Form.Item>
-                  </Col>
-                  <Col span={8}>
-                    <Form.Item
-                      label="Timeline Per Page"
-                      name="timelinePerPage"
-                    >
-                      <InputNumber min={5} max={20} style={{ width: '100%' }} />
-                    </Form.Item>
-                  </Col>
-                  <Col span={8}>
-                    <Form.Item
-                      label="Risks Per Page"
-                      name="risksPerPage"
-                    >
-                      <InputNumber min={3} max={15} style={{ width: '100%' }} />
-                    </Form.Item>
-                  </Col>
-                </Row>
-              </Form>
-                ),
-              },
-              {
-                key: 'colors',
-                label: (
-                  <Space>
-                    <BgColorsOutlined />
-                    <span>Color Theme / ألوان القالب</span>
-                  </Space>
-                ),
-                children: (
-                  <>
-              <Paragraph type="secondary" style={{ marginBottom: 16 }}>
-                Click a color swatch to change it. Changes are saved automatically.
-              </Paragraph>
-              <Row gutter={[16, 16]}>
-                {COLOR_FIELDS.map((cf) => (
-                  <Col span={8} key={cf.key}>
-                    <div style={{ textAlign: 'center' }}>
-                      <Tooltip title={cf.labelAr}>
-                        <ColorPicker
-                          value={`#${currentColors[cf.key as keyof typeof currentColors] || '000000'}`}
-                          onChange={(color) => handleColorChange(cf.key, color)}
-                          showText
-                          size="large"
-                        />
-                      </Tooltip>
-                      <div style={{ marginTop: 4 }}>
-                        <Text strong style={{ fontSize: 12 }}>{cf.label}</Text>
-                        <br />
-                        <Text type="secondary" style={{ fontSize: 11 }}>{cf.labelAr}</Text>
-                      </div>
-                    </div>
-                  </Col>
-                ))}
-              </Row>
-
-              {/* Color preview bar */}
-              <div style={{ marginTop: 16 }}>
-                <Text strong>Preview / معاينة:</Text>
-                <div style={{
-                  display: 'flex',
-                  height: 32,
-                  borderRadius: 6,
-                  overflow: 'hidden',
-                  marginTop: 8,
-                }}>
-                  {COLOR_FIELDS.map((cf) => (
-                    <div
-                      key={cf.key}
-                      style={{
-                        flex: 1,
-                        backgroundColor: `#${currentColors[cf.key as keyof typeof currentColors] || '000000'}`,
-                      }}
-                    />
-                  ))}
-                </div>
-                </div>
-                  </>
-                ),
-              },
-            ]}
-          />
-        </Col>
-
-        {/* RIGHT COLUMN: Slides */}
-        <Col xs={24} lg={12}>
-          <Collapse
-            defaultActiveKey={['slides']}
-            style={{ marginBottom: 16 }}
-            items={[{
-              key: 'slides',
-              label: (
-                <Space>
-                  <AppstoreOutlined />
-                  <span>Slides / الشرائح</span>
-                  <Tag color="blue">{enabledCount} / {slideInfo.length} enabled</Tag>
-                </Space>
-              ),
-              children: (
-                <>
-              <Paragraph type="secondary" style={{ marginBottom: 16 }}>
-                Toggle which slides appear in the generated PowerPoint report. Changes are saved automatically.
-                <br />
-                حدد الشرائح التي تظهر في تقرير PowerPoint. يتم الحفظ تلقائياً.
-              </Paragraph>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {slideInfo.map((slide, idx) => {
-                  const isEnabled = currentSlides[slide.key as keyof typeof currentSlides] ?? true;
-                  return (
-                    <Card
-                      key={slide.key}
-                      size="small"
-                      style={{
-                        borderLeft: `4px solid ${isEnabled ? '#0B4F6C' : '#d9d9d9'}`,
-                        opacity: isEnabled ? 1 : 0.6,
-                        transition: 'all 0.2s',
-                      }}
-                    >
-                      <Row align="middle" justify="space-between">
-                        <Col>
-                          <Space>
-                            <Tag
-                              color={isEnabled ? 'blue' : 'default'}
-                              style={{ minWidth: 28, textAlign: 'center' }}
-                            >
-                              {idx + 1}
-                            </Tag>
-                            <div>
-                              <Text strong>{slide.label}</Text>
-                              <Text type="secondary" style={{ marginLeft: 8, fontSize: 12 }}>
-                                {slide.labelAr}
-                              </Text>
-                              <br />
-                              <Text type="secondary" style={{ fontSize: 12 }}>
-                                {slide.desc}
-                              </Text>
-                              <br />
-                              <Select
-                                size="small"
-                                value={slide.masterLayout}
-                                style={{ marginTop: 4, width: 160 }}
-                                options={MASTER_LAYOUT_OPTIONS}
-                                onChange={v => setSlideInfo(prev => prev.map(s => s.key === slide.key ? { ...s, masterLayout: v } : s))}
-                              />
-                            </div>
-                          </Space>
-                        </Col>
-                        <Col>
-                          <Switch
-                            checked={isEnabled}
-                            onChange={(checked) => handleSlideToggle(slide.key, checked)}
-                          />
-                        </Col>
-                      </Row>
-                    </Card>
-                  );
-                })}
-                {/* Add new slide form */}
-                <Card size="small" style={{ marginTop: 12, background: '#fafafa', border: '1px dashed #0B4F6C' }}>
-                  <Row gutter={[8, 6]} align="middle">
-                    <Col span={5}>
-                      <Input
-                        placeholder="Key"
-                        value={newSlide.key}
-                        onChange={e => setNewSlide({ ...newSlide, key: e.target.value })}
-                        size="small"
-                      />
-                    </Col>
-                    <Col span={5}>
-                      <Input
-                        placeholder="Label"
-                        value={newSlide.label}
-                        onChange={e => setNewSlide({ ...newSlide, label: e.target.value })}
-                        size="small"
-                      />
-                    </Col>
-                    <Col span={6}>
-                      <Input
-                        placeholder="Label (Ar)"
-                        value={newSlide.labelAr}
-                        onChange={e => setNewSlide({ ...newSlide, labelAr: e.target.value })}
-                        size="small"
-                      />
-                    </Col>
-                    <Col span={6}>
-                      <Input
-                        placeholder="Description"
-                        value={newSlide.desc}
-                        onChange={e => setNewSlide({ ...newSlide, desc: e.target.value })}
-                        size="small"
-                      />
-                    </Col>
-                    <Col span={2}>
-                      <Button
-                        icon={<PlusOutlined />}
-                        size="small"
-                        type="primary"
-                        disabled={!newSlide.key || !newSlide.label}
-                        onClick={() => {
-                          setSlideInfo([...slideInfo, { ...newSlide }]);
-                          setNewSlide({ key: '', label: '', labelAr: '', desc: '', masterLayout: 'titleAndContent' });
-                        }}
-                      >
-                        إضافة
-                      </Button>
-                    </Col>
-                    <Col span={24}>
-                      <Select
-                        size="small"
-                        style={{ width: '100%' }}
-                        placeholder="Master Layout"
-                        value={newSlide.masterLayout}
-                        onChange={v => setNewSlide({ ...newSlide, masterLayout: v })}
-                        options={MASTER_LAYOUT_OPTIONS}
-                      />
-                    </Col>
-                  </Row>
-                </Card>
-              </div>
-                </>
-              ),
-            }]}
-          />
-
-          {/* Live preview mockup */}
-          <Card
-            title={
-              <Space>
-                <FileImageOutlined />
-                <span>Slide Order Preview / ترتيب الشرائح</span>
-              </Space>
-            }
-            size="small"
-          >
-            <DndContext
-              collisionDetection={closestCenter}
-              onDragEnd={({ active, over }) => {
-                if (active.id !== over?.id) {
-                  const oldIndex = slideInfo.findIndex(s => s.key === active.id);
-                  const newIndex = slideInfo.findIndex(s => s.key === over?.id);
-                  setSlideInfo(arrayMove(slideInfo, oldIndex, newIndex));
-                }
-              }}
-            >
-              <SortableContext
-                items={slideInfo.filter(s => currentSlides[s.key as keyof typeof currentSlides] ?? true).map(s => s.key)}
-                strategy={verticalListSortingStrategy}
-              >
-                <div style={{
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  gap: 8,
-                  minHeight: 80,
-                }}>
-                  {slideInfo.filter(s => currentSlides[s.key as keyof typeof currentSlides] ?? true).map((slide, idx) => (
-                    <SortableSlide
-                      key={slide.key}
-                      id={slide.key}
-                      idx={idx}
-                      labelAr={slide.labelAr}
-                      primaryColor={currentColors.primary}
-                    />
-                  ))}
-                </div>
-              </SortableContext>
-            </DndContext>
-            {/* ...existing code... */}
-            {/* ...existing code... */}
-          </Card>
-        </Col>
-      </Row>
-
-      {/* Slide Background Images — per-slide overrides */}
-      <div style={{ marginTop: 16 }}>
-        <Title level={5} style={{ marginBottom: 12 }}>
-          <Space><PictureOutlined /> Slide Background Images / خلفيات الشرائح</Space>
-        </Title>
-        <Paragraph type="secondary" style={{ marginTop: -8, marginBottom: 12, fontSize: 12 }}>
-          Upload a full-page background image for each individual slide. Overrides the master layout background for that slide only. Recommended: <strong>1333 × 750 px</strong> (16:9).
-        </Paragraph>
-        <Row gutter={[12, 12]}>
-          {slideInfo.map((slide) => {
-            const imgUrl = slideImages[slide.key] || '';
+      {/* Logos */}
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+          <div style={{ width: 4, height: 20, background: '#0B4F6C', borderRadius: 2 }} />
+          <Text strong style={{ fontSize: 14 }}>الشعارات / Logos</Text>
+        </div>
+        <Row gutter={16}>
+          {(['logoUrlLeft', 'logoUrlRight'] as const).map((logoType) => {
+            const isLeft = logoType === 'logoUrlLeft';
+            const isUploading = isLeft ? uploadingLeft : uploadingRight;
+            const currentUrl = template?.[logoType] || form.getFieldValue(logoType);
             return (
-              <Col xs={24} sm={12} md={8} lg={6} xl={4} key={slide.key}>
+              <Col span={12} key={logoType}>
                 <Card
                   size="small"
-                  style={{ textAlign: 'center', borderTop: '3px solid', borderTopColor: `#${currentColors.primary || '0B4F6C'}` }}
-                  styles={{ body: { padding: '10px 8px' } }}
+                  style={{ borderRadius: 8, border: '1px solid #e8e8e8', textAlign: 'center' }}
+                  styles={{ body: { padding: 16 } }}
                 >
-                  <div style={{ marginBottom: 6 }}>
-                    <Tag color="blue" style={{ fontSize: 10 }}>{slide.label}</Tag>
-                    <div style={{ fontSize: 11, color: '#666', marginTop: 2 }}>{slide.labelAr}</div>
-                  </div>
-                  {imgUrl ? (
-                    <div style={{ marginBottom: 8, padding: 4, border: '1px solid #d9d9d9', borderRadius: 4, background: '#fafafa', minHeight: 48, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 12 }}>
+                    {isLeft ? '◀ شعار يسار / Left Logo' : 'شعار يمين / Right Logo ▶'}
+                  </Text>
+                  {currentUrl ? (
+                    <div style={{
+                      height: 72, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: '#f8fafc', borderRadius: 6, border: '1px solid #e8e8e8', marginBottom: 10,
+                    }}>
                       <img
-                        src={`http://localhost:5000${imgUrl}`}
-                        alt={slide.label}
-                        style={{ maxHeight: 48, maxWidth: '100%', objectFit: 'contain' }}
+                        src={`http://localhost:5000${currentUrl}`}
+                        alt={isLeft ? 'Left Logo' : 'Right Logo'}
+                        style={{ maxHeight: 60, maxWidth: '90%', objectFit: 'contain' }}
                         onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                       />
                     </div>
                   ) : (
-                    <div style={{ marginBottom: 8, height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fafafa', borderRadius: 4, border: '1px dashed #d9d9d9', color: '#bbb', fontSize: 11 }}>
-                      No image
+                    <div style={{
+                      height: 72, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: '#fafafa', borderRadius: 6, border: '2px dashed #d9d9d9', marginBottom: 10,
+                      color: '#bbb', fontSize: 12,
+                    }}>
+                      <Space direction="vertical" size={4} style={{ textAlign: 'center' }}>
+                        <FileImageOutlined style={{ fontSize: 20 }} />
+                        <span>لا يوجد شعار</span>
+                      </Space>
                     </div>
                   )}
-                  <Space direction="vertical" style={{ width: '100%' }} size={4}>
+                  <Space style={{ width: '100%', justifyContent: 'center' }}>
                     <Upload
                       accept="image/*"
                       showUploadList={false}
-                      customRequest={({ file }) => handleSlideImageUpload(slide.key, file as File)}
-                      disabled={uploadingSlide[slide.key]}
+                      customRequest={({ file }) => handleLogoUpload(file as File, logoType)}
+                      disabled={isUploading}
                     >
-                      <Button icon={<PictureOutlined />} loading={uploadingSlide[slide.key]} size="small" style={{ width: '100%' }}>
-                        Upload
+                      <Button icon={<FileImageOutlined />} loading={isUploading} size="small" type="primary" ghost>
+                        {currentUrl ? 'تغيير' : 'رفع'}
                       </Button>
                     </Upload>
-                    {imgUrl && (
-                      <Button danger icon={<DeleteOutlined />} size="small" style={{ width: '100%' }} onClick={() => handleSlideImageDelete(slide.key)}>
-                        Remove
+                    {currentUrl && (
+                      <Button danger icon={<DeleteOutlined />} size="small" onClick={() => handleLogoDelete(logoType)}>
+                        حذف
                       </Button>
                     )}
                   </Space>
@@ -916,30 +463,254 @@ export default function ReportTemplateSettings({ project }: ReportTemplateSettin
             );
           })}
         </Row>
+        <Form.Item label="Logo Display / عرض الشعار" name="logoRepeat" initialValue={template?.logoRepeat || 'first'} style={{ marginTop: 12 }}>
+          <Radio.Group onChange={(e) => saveMutation.mutate({ logoRepeat: e.target.value })} buttonStyle="solid">
+            <Radio.Button value="first">الصفحة الأولى فقط</Radio.Button>
+            <Radio.Button value="all">جميع الشرائح</Radio.Button>
+          </Radio.Group>
+        </Form.Item>
       </div>
 
-      {/* Master Layout Background Images (fallback defaults) */}
-      <div style={{ marginTop: 16 }}>
-        <Title level={5} style={{ marginBottom: 12 }}>
-          <Space><PictureOutlined /> Master Layout Backgrounds / خلفيات التخطيطات الرئيسية</Space>
-        </Title>
-        <Paragraph type="secondary" style={{ marginTop: -8, marginBottom: 12, fontSize: 12 }}>
-          Default background for each master layout type. Applied to all slides using that layout unless overridden above. Recommended: <strong>1333 × 750 px</strong> (16:9).
-        </Paragraph>
+      <Divider style={{ margin: '0 0 20px' }} />
+
+      {/* Language & Display */}
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+          <div style={{ width: 4, height: 20, background: '#0B4F6C', borderRadius: 2 }} />
+          <Text strong style={{ fontSize: 14 }}>اللغة والعرض / Language & Display</Text>
+        </div>
+        <Form.Item label="Report Language / لغة التقرير" name="language">
+          <Radio.Group buttonStyle="solid">
+            <Radio.Button value="ar">العربية</Radio.Button>
+            <Radio.Button value="en">English</Radio.Button>
+            <Radio.Button value="bilingual">ثنائي اللغة</Radio.Button>
+          </Radio.Group>
+        </Form.Item>
+        <Row gutter={16}>
+          <Col span={12}>
+            <Form.Item label="Show Variance Indicator / مؤشر التباين" name="showVarianceIndicator" valuePropName="checked">
+              <Switch checkedChildren="مفعّل" unCheckedChildren="معطّل" />
+            </Form.Item>
+          </Col>
+          <Col span={12}>
+            <Form.Item label="Show Progress Bars / أشرطة التقدم" name="showProgressBars" valuePropName="checked">
+              <Switch checkedChildren="مفعّل" unCheckedChildren="معطّل" />
+            </Form.Item>
+          </Col>
+        </Row>
+        <Row gutter={16}>
+          <Col span={8}>
+            <Form.Item label="Milestones / صفحة" name="milestonesPerPage">
+              <InputNumber min={5} max={20} style={{ width: '100%' }} />
+            </Form.Item>
+          </Col>
+          <Col span={8}>
+            <Form.Item label="Timeline / صفحة" name="timelinePerPage">
+              <InputNumber min={5} max={20} style={{ width: '100%' }} />
+            </Form.Item>
+          </Col>
+          <Col span={8}>
+            <Form.Item label="Risks / صفحة" name="risksPerPage">
+              <InputNumber min={3} max={15} style={{ width: '100%' }} />
+            </Form.Item>
+          </Col>
+        </Row>
+      </div>
+    </Form>
+  );
+
+  // ── Tab: Colors ───────────────────────────────────────────────────────────
+  const allColorFields = [
+    { key: 'primary',   label: 'Primary',   labelAr: 'الأساسي',   desc: 'Header bars, key elements' },
+    { key: 'secondary', label: 'Secondary', labelAr: 'الثانوي',   desc: 'Section slides background' },
+    { key: 'accent',    label: 'Accent',    labelAr: 'التمييز',   desc: 'Divider lines, highlights' },
+    { key: 'success',   label: 'Success',   labelAr: 'النجاح',    desc: 'Completed, on-track' },
+    { key: 'warning',   label: 'Warning',   labelAr: 'التحذير',   desc: 'Medium risk, delayed' },
+    { key: 'danger',    label: 'Danger',    labelAr: 'الخطر',     desc: 'Critical, overdue' },
+  ];
+  const tabColors = (
+    <div>
+      <Alert
+        message="يتم الحفظ تلقائياً عند تغيير اللون / Colors are saved automatically on change"
+        type="info" showIcon style={{ marginBottom: 20, borderRadius: 8 }}
+      />
+      <Row gutter={[16, 16]}>
+        {allColorFields.map((cf) => (
+          <Col span={8} key={cf.key}>
+            <Card
+              size="small"
+              style={{ borderRadius: 8, textAlign: 'center', borderTop: `3px solid #${currentColors[cf.key as keyof typeof currentColors] || '000000'}` }}
+              styles={{ body: { padding: '16px 12px' } }}
+            >
+              <Tooltip title={cf.desc}>
+                <ColorPicker
+                  value={`#${currentColors[cf.key as keyof typeof currentColors] || '000000'}`}
+                  onChange={(color) => handleColorChange(cf.key, color)}
+                  showText
+                  size="large"
+                />
+              </Tooltip>
+              <div style={{ marginTop: 8 }}>
+                <Text strong style={{ fontSize: 13 }}>{cf.label}</Text>
+                <br />
+                <Text type="secondary" style={{ fontSize: 11 }}>{cf.labelAr}</Text>
+              </div>
+            </Card>
+          </Col>
+        ))}
+      </Row>
+      <div style={{ marginTop: 20 }}>
+        <Text strong style={{ display: 'block', marginBottom: 8 }}>معاينة / Preview:</Text>
+        <div style={{ display: 'flex', height: 40, borderRadius: 8, overflow: 'hidden', border: '1px solid #e8e8e8' }}>
+          {allColorFields.map((cf) => (
+            <Tooltip key={cf.key} title={cf.labelAr}>
+              <div
+                style={{
+                  flex: 1,
+                  backgroundColor: `#${currentColors[cf.key as keyof typeof currentColors] || '000000'}`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer',
+                }}
+              >
+                <Text style={{ fontSize: 9, color: '#fff', textShadow: '0 1px 2px #0005' }}>{cf.labelAr}</Text>
+              </div>
+            </Tooltip>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  // ── Tab: Slides ───────────────────────────────────────────────────────────
+  const tabSlides = (
+    <div>
+      <Alert
+        message={`${enabledCount} من ${slideInfo.length} شريحة مفعّلة / ${enabledCount} of ${slideInfo.length} slides enabled`}
+        type={enabledCount > 0 ? 'success' : 'warning'}
+        showIcon style={{ marginBottom: 16, borderRadius: 8 }}
+      />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+        {slideInfo.map((slide, idx) => {
+          const isEnabled = currentSlides[slide.key as keyof typeof currentSlides] ?? true;
+          return (
+            <Card
+              key={slide.key}
+              size="small"
+              style={{
+                borderRadius: 8,
+                borderLeft: `4px solid ${isEnabled ? `#${currentColors.primary || '0B4F6C'}` : '#d9d9d9'}`,
+                opacity: isEnabled ? 1 : 0.55,
+                transition: 'all 0.2s',
+                background: isEnabled ? '#fff' : '#fafafa',
+              }}
+              styles={{ body: { padding: '10px 14px' } }}
+            >
+              <Row align="middle" justify="space-between" wrap={false}>
+                <Col flex="auto">
+                  <Space align="start">
+                    <div style={{
+                      width: 28, height: 28, borderRadius: 6, display: 'flex', alignItems: 'center',
+                      justifyContent: 'center', background: isEnabled ? `#${currentColors.primary || '0B4F6C'}` : '#e8e8e8',
+                      color: isEnabled ? '#fff' : '#aaa', fontWeight: 700, fontSize: 12, flexShrink: 0,
+                    }}>
+                      {idx + 1}
+                    </div>
+                    <div>
+                      <Space wrap={false} size={6}>
+                        <Text strong style={{ fontSize: 13 }}>{slide.labelAr}</Text>
+                        <Text type="secondary" style={{ fontSize: 12 }}>/ {slide.label}</Text>
+                      </Space>
+                      <br />
+                      <Text type="secondary" style={{ fontSize: 11 }}>{slide.desc}</Text>
+                      <br />
+                      <Select
+                        size="small"
+                        value={slide.masterLayout}
+                        style={{ marginTop: 4, width: 170 }}
+                        options={MASTER_LAYOUT_OPTIONS}
+                        onChange={v => setSlideInfo(prev => prev.map(s => s.key === slide.key ? { ...s, masterLayout: v } : s))}
+                        disabled={!isEnabled}
+                      />
+                    </div>
+                  </Space>
+                </Col>
+                <Col flex="none" style={{ paddingLeft: 12 }}>
+                  <Switch
+                    checked={isEnabled}
+                    onChange={(checked) => handleSlideToggle(slide.key, checked)}
+                    checkedChildren={<CheckCircleOutlined />}
+                    unCheckedChildren={<StopOutlined />}
+                  />
+                </Col>
+              </Row>
+            </Card>
+          );
+        })}
+      </div>
+
+      {/* Live preview */}
+      <Divider style={{ margin: '0 0 12px' }}>
+        <Text type="secondary" style={{ fontSize: 12 }}>ترتيب الشرائح المفعّلة / Slide Order Preview</Text>
+      </Divider>
+      <DndContext
+        collisionDetection={closestCenter}
+        onDragEnd={({ active, over }) => {
+          if (active.id !== over?.id) {
+            const oldIndex = slideInfo.findIndex(s => s.key === active.id);
+            const newIndex = slideInfo.findIndex(s => s.key === over?.id);
+            setSlideInfo(arrayMove(slideInfo, oldIndex, newIndex));
+          }
+        }}
+      >
+        <SortableContext
+          items={slideInfo.filter(s => currentSlides[s.key as keyof typeof currentSlides] ?? true).map(s => s.key)}
+          strategy={verticalListSortingStrategy}
+        >
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, minHeight: 80 }}>
+            {slideInfo.filter(s => currentSlides[s.key as keyof typeof currentSlides] ?? true).map((slide, idx) => (
+              <SortableSlide
+                key={slide.key}
+                id={slide.key}
+                idx={idx}
+                labelAr={slide.labelAr}
+                primaryColor={currentColors.primary}
+              />
+            ))}
+          </div>
+        </SortableContext>
+      </DndContext>
+    </div>
+  );
+
+  // ── Tab: Backgrounds ─────────────────────────────────────────────────────
+  const tabBackgrounds = (
+    <div>
+      {/* Master layout backgrounds only */}
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+          <div style={{ width: 4, height: 20, background: '#1A7FA1', borderRadius: 2 }} />
+          <Text strong style={{ fontSize: 14 }}>خلفيات التخطيطات الرئيسية / Master Layout Backgrounds</Text>
+        </div>
+        <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 12 }}>
+          تطبّق على كل الشرائح التي تستخدم نفس التخطيط. المقاس الموصى به: <strong>1333 × 750 px</strong>
+        </Text>
         <Row gutter={[12, 12]}>
           {MASTER_LAYOUT_OPTIONS.map(({ value, label }) => {
             const lt = value as LayoutType;
             const imgUrl = layoutImages[lt];
             return (
-              <Col xs={24} sm={12} md={8} lg={6} xl={4} key={lt}>
+              <Col xs={12} sm={8} md={6} key={lt}>
                 <Card
                   size="small"
-                  style={{ textAlign: 'center', borderTop: `3px solid`, borderTopColor: `var(--ant-color-primary, #0B4F6C)` }}
+                  style={{ borderRadius: 8, textAlign: 'center', borderTop: `3px solid var(--ant-color-primary, #0B4F6C)` }}
                   styles={{ body: { padding: '10px 8px' } }}
                 >
-                  <Tag color={MASTER_LAYOUT_COLORS[lt]} style={{ marginBottom: 8 }}>{label}</Tag>
+                  <Tag color={MASTER_LAYOUT_COLORS[lt]} style={{ fontSize: 10, marginBottom: 6 }}>{label}</Tag>
                   {imgUrl ? (
-                    <div style={{ marginBottom: 8, padding: 4, border: '1px solid #d9d9d9', borderRadius: 4, background: '#fafafa', minHeight: 48, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{
+                      height: 52, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: '#f8fafc', borderRadius: 6, border: '1px solid #e8e8e8', marginBottom: 8,
+                    }}>
                       <img
                         src={`http://localhost:5000${imgUrl}`}
                         alt={label}
@@ -948,24 +719,26 @@ export default function ReportTemplateSettings({ project }: ReportTemplateSettin
                       />
                     </div>
                   ) : (
-                    <div style={{ marginBottom: 8, height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fafafa', borderRadius: 4, border: '1px dashed #d9d9d9', color: '#bbb', fontSize: 11 }}>
-                      No image
+                    <div style={{
+                      height: 52, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: '#fafafa', borderRadius: 6, border: '1px dashed #d9d9d9', marginBottom: 8,
+                      color: '#bbb', fontSize: 11,
+                    }}>
+                      <LayoutOutlined style={{ fontSize: 16 }} />
                     </div>
                   )}
                   <Space direction="vertical" style={{ width: '100%' }} size={4}>
-                    <Upload
-                      accept="image/*"
-                      showUploadList={false}
+                    <Upload accept="image/*" showUploadList={false}
                       customRequest={({ file }) => handleLayoutImageUpload(lt, file as File)}
                       disabled={uploadingLayout[lt]}
                     >
-                      <Button icon={<PictureOutlined />} loading={uploadingLayout[lt]} size="small" style={{ width: '100%' }}>
-                        Upload
+                      <Button icon={<PictureOutlined />} loading={uploadingLayout[lt]} size="small" type="primary" ghost style={{ width: '100%' }}>
+                        {imgUrl ? 'تغيير' : 'رفع'}
                       </Button>
                     </Upload>
                     {imgUrl && (
                       <Button danger icon={<DeleteOutlined />} size="small" style={{ width: '100%' }} onClick={() => handleLayoutImageDelete(lt)}>
-                        Remove
+                        حذف
                       </Button>
                     )}
                   </Space>
@@ -975,10 +748,118 @@ export default function ReportTemplateSettings({ project }: ReportTemplateSettin
           })}
         </Row>
       </div>
-
     </div>
   );
 
+  // ── Main render ──────────────────────────────────────────────────────────
+  return (
+    <div>
+      {/* Header */}
+      <div style={{
+        background: 'linear-gradient(135deg, #0B4F6C 0%, #1A7FA1 100%)',
+        borderRadius: 12,
+        padding: '20px 24px',
+        marginBottom: 20,
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+      }}>
+        <Space>
+          <div style={{
+            width: 44, height: 44, borderRadius: 10, background: 'rgba(255,255,255,0.15)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <FilePptOutlined style={{ fontSize: 22, color: '#fff' }} />
+          </div>
+          <div>
+            <Text style={{ color: '#fff', fontSize: 16, fontWeight: 700, display: 'block' }}>
+              إعدادات قالب التقرير
+            </Text>
+            <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12 }}>
+              Report Template Settings — {project.name}
+            </Text>
+          </div>
+        </Space>
+        <Space>
+          <Button
+            icon={<EyeOutlined />}
+            onClick={handlePreviewExport}
+            loading={isExporting}
+            style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff' }}
+          >
+            معاينة
+          </Button>
+          <Button
+            icon={<UndoOutlined />}
+            onClick={handleReset}
+            style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.3)', color: '#fff' }}
+          >
+            إعادة تعيين
+          </Button>
+          <Button
+            type="primary"
+            icon={<SaveOutlined />}
+            onClick={handleSave}
+            loading={saveMutation.isPending}
+            style={{ background: '#2EADD3', border: 'none', fontWeight: 600 }}
+          >
+            حفظ الإعدادات
+          </Button>
+        </Space>
+      </div>
+
+      {/* Tabs */}
+      <Card style={{ borderRadius: 12 }} styles={{ body: { padding: '0 24px 24px' } }}>
+        <Tabs
+          defaultActiveKey="general"
+          size="large"
+          items={[
+            {
+              key: 'general',
+              label: (
+                <Space>
+                  <SettingOutlined />
+                  <span>الإعدادات العامة</span>
+                </Space>
+              ),
+              children: <div style={{ paddingTop: 16 }}>{tabGeneral}</div>,
+            },
+            {
+              key: 'slides',
+              label: (
+                <Space>
+                  <AppstoreOutlined />
+                  <span>الشرائح</span>
+                  <Badge count={enabledCount} style={{ background: '#0B4F6C' }} />
+                </Space>
+              ),
+              children: <div style={{ paddingTop: 16 }}>{tabSlides}</div>,
+            },
+            {
+              key: 'colors',
+              label: (
+                <Space>
+                  <BgColorsOutlined />
+                  <span>الألوان</span>
+                </Space>
+              ),
+              children: <div style={{ paddingTop: 16 }}>{tabColors}</div>,
+            },
+            {
+              key: 'backgrounds',
+              label: (
+                <Space>
+                  <PictureOutlined />
+                  <span>الخلفيات</span>
+                </Space>
+              ),
+              children: <div style={{ paddingTop: 16 }}>{tabBackgrounds}</div>,
+            },
+          ]}
+        />
+      </Card>
+    </div>
+  );
 }
 
 // Sortable slide component for drag-and-drop
