@@ -21,9 +21,13 @@
   "dependencies": {
     "@prisma/client": "^5.22.0",
     "@types/multer": "^2.0.0",
+    "@types/pizzip": "^3.0.5",
     "@types/xml2js": "^0.4.14",
+    "adm-zip": "^0.5.17",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
+    "docx": "^9.6.1",
+    "docxtemplater": "^3.68.6",
     "dotenv": "^17.3.0",
     "exceljs": "^4.4.0",
     "express": "^5.2.1",
@@ -31,11 +35,13 @@
     "jsonwebtoken": "^9.0.3",
     "morgan": "^1.10.1",
     "multer": "^2.0.2",
+    "pizzip": "^3.2.0",
     "pptxgenjs": "^4.0.1",
     "xml2js": "^0.6.2",
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@types/adm-zip": "^0.5.8",
     "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",

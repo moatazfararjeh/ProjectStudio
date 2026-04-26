@@ -17,7 +17,6 @@ import {
   ArrowLeftOutlined,
   CheckSquareOutlined,
   TeamOutlined,
-  ClockCircleOutlined,
   FileTextOutlined,
   WarningOutlined,
   SaveOutlined,
@@ -25,6 +24,7 @@ import {
   CalendarOutlined,
   FilePptOutlined,
   CheckCircleOutlined,
+  AuditOutlined,
 } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -86,6 +86,7 @@ export default function MainLayout() {
         { key: 'this-week', icon: <RocketOutlined />, label: 'This Week' },
         { key: 'next-week', icon: <CalendarOutlined />, label: 'Next Week' },
         { key: 'weekly-highlights', icon: <CheckCircleOutlined />, label: 'Weekly Highlights' },
+        { key: 'meeting-minutes', icon: <AuditOutlined />, label: 'Meeting Minutes' },
       ],
     },
     {

@@ -101,6 +101,7 @@ model Project {
   reports          Report[]
   products         ProjectProduct[]  // Products sold in this project
   weeklyHighlights WeeklyHighlight[]
+  meetingMinutes   MeetingMinutes[]
   
   @@map("projects")
 }
@@ -183,6 +184,7 @@ model Task {
   dependents   TaskDependency[] @relation("PredecessorTask")
   worklogs     Worklog[]
   comments     Comment[]
+  raidLinks    RAIDItem[]       @relation("RAIDLinkedTask")
   
   @@map("tasks")
 }
@@ -319,6 +321,9 @@ model RAIDItem {
   
   comments    String?  // History comments
   
+  linkedTaskId  String?   // Optional link to a project task
+  linkedTask    Task?     @relation("RAIDLinkedTask", fields: [linkedTaskId], references: [id], onDelete: SetNull)
+
   identifiedDate     DateTime  @default(now())
   targetDate         DateTime? // Closure due date
   revisedTargetDate  DateTime? // Revised closure due date
@@ -606,5 +611,45 @@ model WeeklyHighlight {
 enum WeeklyHighlightType {
   COMPLETED
   PLANNED
+}
+
+// ============================================
+// MEETING MINUTES (محضر الاجتماع)
+// ============================================
+
+model MeetingMinutes {
+  id          String   @id @default(uuid())
+
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  // Meeting header info
+  title       String                        // موضوع الاجتماع
+  meetingDate DateTime                      // تاريخ ووقت الاجتماع
+  location    String?                       // مكان / رابط الاجتماع
+  facilitator String?                       // مدير الاجتماع
+
+  // Attendees stored as JSON arrays of names/roles
+  attendees   Json     @default("[]")       // [{ name, role, attended: true }]
+  absentees   Json     @default("[]")       // [{ name, role, reason? }]
+
+  // Meeting body
+  keyPoints   Json     @default("[]")       // [{ point: string }]  — أبرز النقاط
+
+  // Action items / tasks
+  actionItems Json     @default("[]")       // [{ task, dueDate, assignedTo, status }]
+
+  // Additional notes
+  notes       String?
+
+  // Document language: AR (Arabic/RTL) or EN (English/LTR)
+  language    String   @default("AR")
+
+  createdById String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("meeting_minutes")
 }
 

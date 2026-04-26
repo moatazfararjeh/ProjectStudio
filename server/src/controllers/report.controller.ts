@@ -4,6 +4,7 @@ import { AppError } from '../middleware/errorHandler';
 import { AuthRequest } from '../middleware/auth';
 import { generateWeeklyReportPPT } from '../utils/pptGenerator';
 import { DEFAULT_REPORT_TEMPLATE, HF_LAYOUT_KEYS, HeaderFooterLayoutConfig } from '../utils/reportTemplateConfig';
+import { extractDocxTheme } from '../utils/docxThemeExtractor';
 import fs from 'fs';
 import path from 'path';
 
@@ -590,4 +591,5 @@ function getWeekNumber(date: Date): number {
   const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
   return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
 }
+
 

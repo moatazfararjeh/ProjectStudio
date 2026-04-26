@@ -449,6 +449,59 @@ class ApiClient {
     const { data } = await this.client.delete(`/projects/${projectId}/weekly-highlights/${hid}`);
     return data;
   }
+
+  // Meeting Minutes
+  async getMeetingMinutes(projectId: string) {
+    const { data } = await this.client.get(`/projects/${projectId}/meeting-minutes`);
+    return data;
+  }
+
+  async getMeetingMinute(projectId: string, mid: string) {
+    const { data } = await this.client.get(`/projects/${projectId}/meeting-minutes/${mid}`);
+    return data;
+  }
+
+  async createMeetingMinutes(projectId: string, payload: Record<string, unknown>) {
+    const { data } = await this.client.post(`/projects/${projectId}/meeting-minutes`, payload);
+    return data;
+  }
+
+  async updateMeetingMinutes(projectId: string, mid: string, payload: Record<string, unknown>) {
+    const { data } = await this.client.put(`/projects/${projectId}/meeting-minutes/${mid}`, payload);
+    return data;
+  }
+
+  async deleteMeetingMinutes(projectId: string, mid: string) {
+    const { data } = await this.client.delete(`/projects/${projectId}/meeting-minutes/${mid}`);
+    return data;
+  }
+
+  /** Download a filled .docx for a single meeting minute */
+  async exportMeetingMinutes(projectId: string, mid: string): Promise<Blob> {
+    const response = await this.client.get(
+      `/projects/${projectId}/meeting-minutes/${mid}/export`,
+      { responseType: 'blob' },
+    );
+    return response.data as Blob;
+  }
+
+  /** Upload a custom .docx template for MOM exports */
+  async uploadMoMTemplate(projectId: string, file: File): Promise<{ masterTemplatePath: string }> {
+    const form = new FormData();
+    form.append('template', file);
+    const { data } = await this.client.post(
+      `/projects/${projectId}/meeting-minutes/template`,
+      form,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
+    return data;
+  }
+
+  /** Remove the custom MOM template for a project */
+  async deleteMoMTemplate(projectId: string) {
+    const { data } = await this.client.delete(`/projects/${projectId}/meeting-minutes/template`);
+    return data;
+  }
 }
 
 export const api = new ApiClient();

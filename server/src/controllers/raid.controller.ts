@@ -19,6 +19,7 @@ const raidSchema = z.object({
   mitigationOwnerId: z.string().optional().nullable(),
   ownerId: z.string().optional().nullable(),
   comments: z.string().optional().nullable(),
+  linkedTaskId: z.string().optional().nullable(),
   identifiedDate: z.string().optional().nullable(),
   targetDate: z.string().optional().nullable(),
   revisedTargetDate: z.string().optional().nullable(),
@@ -59,6 +60,9 @@ export const getRAIDItems = async (req: AuthRequest, res: Response, next: NextFu
         project: {
           select: { id: true, name: true },
         },
+        linkedTask: {
+          select: { id: true, name: true, status: true },
+        },
       },
       orderBy: [
         { riskScore: 'desc' },
@@ -90,6 +94,9 @@ export const getRAIDItem = async (req: AuthRequest, res: Response, next: NextFun
         },
         project: {
           select: { id: true, name: true },
+        },
+        linkedTask: {
+          select: { id: true, name: true, status: true },
         },
       },
     });
@@ -132,6 +139,9 @@ export const createRAIDItem = async (req: AuthRequest, res: Response, next: Next
         mitigationOwner: {
           select: { id: true, firstName: true, lastName: true, avatar: true },
         },
+        linkedTask: {
+          select: { id: true, name: true, status: true },
+        },
       },
     });
 
@@ -152,7 +162,7 @@ export const updateRAIDItem = async (req: AuthRequest, res: Response, next: Next
     console.log('[RAID Update] Received data:', JSON.stringify(data, null, 2));
 
     // Explicitly exclude relation fields and non-updateable fields
-    const excludedFields = ['owner', 'project', 'id', 'createdAt', 'updatedAt', 'identifiedDate', 'projectId', 'closedDate', 'mitigationOwner'];
+    const excludedFields = ['owner', 'project', 'id', 'createdAt', 'updatedAt', 'identifiedDate', 'projectId', 'closedDate', 'mitigationOwner', 'linkedTask'];
     
     // Filter out excluded fields
     const updateData: any = {};
@@ -189,6 +199,9 @@ export const updateRAIDItem = async (req: AuthRequest, res: Response, next: Next
         },
         mitigationOwner: {
           select: { id: true, firstName: true, lastName: true, avatar: true },
+        },
+        linkedTask: {
+          select: { id: true, name: true, status: true },
         },
       },
     });

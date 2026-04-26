@@ -25,6 +25,9 @@ import {
   Badge,
   Segmented,
   Dropdown,
+  Divider,
+  List,
+  Typography,
 } from 'antd';
 import {
   PlusOutlined,
@@ -48,12 +51,16 @@ import {
   CalendarOutlined,
   TeamOutlined,
   FieldTimeOutlined,
+  LinkOutlined,
+  FileExcelOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
+import ExcelJS from 'exceljs';
 import api from '../../lib/api';
 import type { Project, Task } from '../../types';
 
 const { TextArea } = Input;
+const { Text } = Typography;
 
 interface ProjectTasksProps {
   project: Project;
@@ -170,6 +177,20 @@ export default function ProjectTasks({ project }: ProjectTasksProps) {
     queryFn: () => api.getTasks({ projectId: project.id }),
   });
 
+  // All RAID items for this project (used to show badge in table)
+  const { data: allRaidItems = [] } = useQuery({
+    queryKey: ['raid-items', project.id],
+    queryFn: () => api.getRAIDItems({ projectId: project.id }),
+  });
+
+  // RAID items linked to the task currently being edited
+  const { data: linkedRaidItems = [] } = useQuery({
+    queryKey: ['raid-items', project.id],
+    queryFn: () => api.getRAIDItems({ projectId: project.id }),
+    select: (items: any[]) => items.filter((r: any) => r.linkedTaskId === editingTask?.id),
+    enabled: !!editingTask,
+  });
+
   // Expand all parent tasks by default when tasks load
   useEffect(() => {
     if (tasks.length > 0) {
@@ -244,6 +265,98 @@ export default function ProjectTasks({ project }: ProjectTasksProps) {
     form.setFieldsValue({ projectId: project.id });
     setIsModalOpen(true);
   };
+
+  async function handleExportExcel() {
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Tasks');
+
+    ws.columns = [
+      { header: '#',              key: 'idx',         width: 6  },
+      { header: 'Task Name',      key: 'name',        width: 40 },
+      { header: 'Status',         key: 'status',      width: 16 },
+      { header: 'Priority',       key: 'priority',    width: 12 },
+      { header: 'Assignee',       key: 'assignee',    width: 24 },
+      { header: 'Progress (%)',   key: 'progress',    width: 14 },
+      { header: 'Duration (days)',key: 'duration',    width: 16 },
+      { header: 'Start Date',     key: 'startDate',   width: 14 },
+      { header: 'End Date',       key: 'endDate',     width: 14 },
+      { header: 'Baseline Start', key: 'bStart',      width: 16 },
+      { header: 'Baseline End',   key: 'bFinish',     width: 16 },
+      { header: 'Actual Start',   key: 'aStart',      width: 16 },
+      { header: 'Actual End',     key: 'aFinish',     width: 16 },
+      { header: 'Description',    key: 'description', width: 40 },
+    ];
+
+    // Style header row
+    ws.getRow(1).eachCell((cell) => {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF8B0000' } };
+      cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+      cell.alignment = { vertical: 'middle', horizontal: 'center' };
+      cell.border = { bottom: { style: 'thin', color: { argb: 'FFCCCCCC' } } };
+    });
+    ws.getRow(1).height = 22;
+
+    const statusLabel: Record<string, string> = {
+      NOT_STARTED: 'Not Started', IN_PROGRESS: 'In Progress',
+      BLOCKED: 'Blocked', COMPLETED: 'Completed', CANCELLED: 'Cancelled',
+    };
+
+    const allTasksOrdered = getVisibleTasks(tasks);
+    allTasksOrdered.forEach((task, i) => {
+      const level = getTaskLevel(task, tasks);
+      const indent = '  '.repeat(level);
+      const assigneeName = task.assignedTo
+        ? `${task.assignedTo.firstName} ${task.assignedTo.lastName}`
+        : (task as any).assigneeName || 'Unassigned';
+
+      const row = ws.addRow({
+        idx:         i + 1,
+        name:        indent + task.name,
+        status:      statusLabel[task.status] ?? task.status,
+        priority:    task.priority,
+        assignee:    assigneeName,
+        progress:    task.progress ?? 0,
+        duration:    task.duration ?? '',
+        startDate:   task.startDate  ? dayjs(task.startDate).format('YYYY-MM-DD')  : '',
+        endDate:     task.endDate    ? dayjs(task.endDate).format('YYYY-MM-DD')    : '',
+        bStart:      task.baselineStart  ? dayjs(task.baselineStart).format('YYYY-MM-DD')  : '',
+        bFinish:     task.baselineFinish ? dayjs(task.baselineFinish).format('YYYY-MM-DD') : '',
+        aStart:      task.actualStart  ? dayjs(task.actualStart).format('YYYY-MM-DD')  : '',
+        aFinish:     task.actualFinish ? dayjs(task.actualFinish).format('YYYY-MM-DD') : '',
+        description: task.description ?? '',
+      });
+
+      // Zebra striping
+      if (i % 2 === 1) {
+        row.eachCell((cell) => {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9F9F9' } };
+        });
+      }
+
+      // Bold top-level task names
+      if (level === 0) {
+        row.getCell('name').font = { bold: true };
+      }
+
+      row.eachCell((cell) => {
+        cell.alignment = { vertical: 'middle' };
+        cell.border = { bottom: { style: 'hair', color: { argb: 'FFE8E8E8' } } };
+      });
+    });
+
+    // Freeze header row
+    ws.views = [{ state: 'frozen', ySplit: 1 }];
+
+    const buf = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buf], { type: 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Tasks_${project.name.replace(/\s+/g, '_')}_${dayjs().format('YYYY-MM-DD')}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
+    message.success('Tasks exported successfully');
+  }
 
   const handleEdit = (task: Task) => {
     setEditingTask(task);
@@ -753,6 +866,24 @@ export default function ProjectTasks({ project }: ProjectTasksProps) {
       },
     },
     {
+      title: 'RAID',
+      key: 'raid',
+      width: 70,
+      fixed: 'right' as const,
+      render: (_: any, record: Task) => {
+        const items = (allRaidItems as any[]).filter((r: any) => r.linkedTaskId === record.id);
+        if (items.length === 0) return <span style={{ color: '#bfbfbf' }}>—</span>;
+        const typeColors: Record<string, string> = { RISK: '#ff4d4f', ASSUMPTION: '#1677ff', ISSUE: '#fa8c16', DEPENDENCY: '#722ed1' };
+        return (
+          <Tooltip title={items.map((r: any) => `[${r.type}] ${r.title}`).join('\n')}>
+            <Badge count={items.length} size="small" color={typeColors[items[0].type] || '#1677ff'}>
+              <LinkOutlined style={{ fontSize: 14, color: '#8c8c8c', cursor: 'default' }} />
+            </Badge>
+          </Tooltip>
+        );
+      },
+    },
+    {
       title: 'Deps',
       dataIndex: 'dependencies',
       key: 'dependencies',
@@ -941,11 +1072,13 @@ export default function ProjectTasks({ project }: ProjectTasksProps) {
             <Button icon={<UploadOutlined />} onClick={handleImport} style={{ borderRadius: 8 }}>
               Import MPP
             </Button>
+            <Button icon={<FileExcelOutlined />} onClick={handleExportExcel} style={{ borderRadius: 8 }}>
+              Export Excel
+            </Button>
             <Button 
               type="primary" 
               icon={<PlusOutlined />} 
               onClick={handleCreate}
-              style={{ borderRadius: 8, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', border: 'none' }}
             >
               {t('tasks.new')}
             </Button>
@@ -1230,7 +1363,7 @@ export default function ProjectTasks({ project }: ProjectTasksProps) {
             rules={[{ required: true, message: t('common.required') }]}
             initialValue="NOT_STARTED"
           >
-            <Select>
+            <Select onChange={() => form.validateFields(['actualStart', 'actualFinish'])}>
               <Select.Option value="NOT_STARTED">{t('tasks.status_not_started')}</Select.Option>
               <Select.Option value="IN_PROGRESS">{t('tasks.status_in_progress')}</Select.Option>
               <Select.Option value="BLOCKED">{t('tasks.status_blocked')}</Select.Option>
@@ -1253,28 +1386,116 @@ export default function ProjectTasks({ project }: ProjectTasksProps) {
             </Select>
           </Form.Item>
 
-          <Form.Item name="startDate" label={t('tasks.startDate')}>
-            <DatePicker style={{ width: '100%' }} />
+          <Form.Item
+            name="startDate"
+            label={t('tasks.startDate')}
+            rules={[{
+              validator: (_, value) => {
+                if (!value) return Promise.resolve();
+                const end = form.getFieldValue('endDate');
+                if (end && value.isAfter(end, 'day'))
+                  return Promise.reject(new Error('Start date must be before or equal to end date'));
+                return Promise.resolve();
+              },
+            }]}
+          >
+            <DatePicker style={{ width: '100%' }} onChange={() => form.validateFields(['endDate'])} />
           </Form.Item>
 
-          <Form.Item name="endDate" label={t('tasks.endDate')}>
-            <DatePicker style={{ width: '100%' }} />
+          <Form.Item
+            name="endDate"
+            label={t('tasks.endDate')}
+            rules={[{
+              validator: (_, value) => {
+                if (!value) return Promise.resolve();
+                const start = form.getFieldValue('startDate');
+                if (start && value.isBefore(start, 'day'))
+                  return Promise.reject(new Error('End date must be after or equal to start date'));
+                return Promise.resolve();
+              },
+            }]}
+          >
+            <DatePicker style={{ width: '100%' }} onChange={() => form.validateFields(['startDate'])} />
           </Form.Item>
 
-          <Form.Item name="baselineStart" label="Baseline Start">
-            <DatePicker style={{ width: '100%' }} />
+          <Form.Item
+            name="baselineStart"
+            label="Baseline Start"
+            rules={[{
+              validator: (_, value) => {
+                if (!value) return Promise.resolve();
+                const end = form.getFieldValue('baselineFinish');
+                if (end && value.isAfter(end, 'day'))
+                  return Promise.reject(new Error('Baseline start must be before or equal to baseline finish'));
+                return Promise.resolve();
+              },
+            }]}
+          >
+            <DatePicker style={{ width: '100%' }} onChange={() => form.validateFields(['baselineFinish'])} />
           </Form.Item>
 
-          <Form.Item name="baselineFinish" label="Baseline Finish">
-            <DatePicker style={{ width: '100%' }} />
+          <Form.Item
+            name="baselineFinish"
+            label="Baseline Finish"
+            rules={[{
+              validator: (_, value) => {
+                if (!value) return Promise.resolve();
+                const start = form.getFieldValue('baselineStart');
+                if (start && value.isBefore(start, 'day'))
+                  return Promise.reject(new Error('Baseline finish must be after or equal to baseline start'));
+                return Promise.resolve();
+              },
+            }]}
+          >
+            <DatePicker style={{ width: '100%' }} onChange={() => form.validateFields(['baselineStart'])} />
           </Form.Item>
 
-          <Form.Item name="actualStart" label="Actual Start">
-            <DatePicker style={{ width: '100%' }} />
+          <Form.Item
+            name="actualStart"
+            label="Actual Start"
+            rules={[{
+              validator: (_, value) => {
+                const status = form.getFieldValue('status');
+                const actualFinish = form.getFieldValue('actualFinish');
+                if (!value) {
+                  if (status === 'IN_PROGRESS')
+                    return Promise.reject(new Error('Actual start is required when status is In Progress'));
+                  if (status === 'COMPLETED')
+                    return Promise.reject(new Error('Actual start is required when status is Completed'));
+                  if (actualFinish)
+                    return Promise.reject(new Error('Actual start is required when actual finish is set'));
+                  return Promise.resolve();
+                }
+                if (actualFinish && value.isAfter(actualFinish, 'day'))
+                  return Promise.reject(new Error('Actual start must be before or equal to actual finish'));
+                return Promise.resolve();
+              },
+            }]}
+          >
+            <DatePicker style={{ width: '100%' }} onChange={() => form.validateFields(['actualFinish'])} />
           </Form.Item>
 
-          <Form.Item name="actualFinish" label="Actual Finish">
-            <DatePicker style={{ width: '100%' }} />
+          <Form.Item
+            name="actualFinish"
+            label="Actual Finish"
+            rules={[{
+              validator: (_, value) => {
+                const status = form.getFieldValue('status');
+                if (!value) {
+                  if (status === 'COMPLETED')
+                    return Promise.reject(new Error('Actual finish is required when status is Completed'));
+                  return Promise.resolve();
+                }
+                const start = form.getFieldValue('actualStart');
+                if (!start)
+                  return Promise.reject(new Error('Actual start must be set before actual finish'));
+                if (value.isBefore(start, 'day'))
+                  return Promise.reject(new Error('Actual finish must be after or equal to actual start'));
+                return Promise.resolve();
+              },
+            }]}
+          >
+            <DatePicker style={{ width: '100%' }} onChange={() => form.validateFields(['actualStart'])} />
           </Form.Item>
 
           <Form.Item 
@@ -1285,6 +1506,31 @@ export default function ProjectTasks({ project }: ProjectTasksProps) {
           >
             <Input type="number" min={0} step={0.5} placeholder="Enter duration in days" />
           </Form.Item>
+
+          {editingTask && linkedRaidItems.length > 0 && (
+            <>
+              <Divider style={{ fontSize: 13, margin: '12px 0 6px' }}>
+                <Space><LinkOutlined />Linked RAID Items</Space>
+              </Divider>
+              <List
+                size="small"
+                dataSource={linkedRaidItems}
+                renderItem={(item: any) => {
+                  const typeColors: Record<string, string> = { RISK: 'red', ASSUMPTION: 'blue', ISSUE: 'orange', DEPENDENCY: 'purple' };
+                  const statusColors: Record<string, string> = { OPEN: 'default', IN_PROGRESS: 'processing', MITIGATED: 'cyan', CLOSED: 'success' };
+                  return (
+                    <List.Item style={{ padding: '6px 0' }}>
+                      <Space wrap>
+                        <Tag color={typeColors[item.type] || 'default'} style={{ marginRight: 0 }}>{item.type}</Tag>
+                        <Text style={{ fontSize: 13 }}>{item.title}</Text>
+                        <Tag color={statusColors[item.status] || 'default'} style={{ marginRight: 0 }}>{item.status}</Tag>
+                      </Space>
+                    </List.Item>
+                  );
+                }}
+              />
+            </>
+          )}
         </Form>
       </RightDrawer>
 

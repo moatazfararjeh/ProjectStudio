@@ -22,6 +22,42 @@ const taskSchema = z.object({
   status: z.enum(['NOT_STARTED', 'IN_PROGRESS', 'BLOCKED', 'COMPLETED', 'CANCELLED']).optional(),
   assignedToId: z.string().optional().nullable(),
   assigneeName: z.string().optional().nullable(),
+}).superRefine((data, ctx) => {
+  // Planned: start must be <= finish
+  if (data.startDate && data.endDate) {
+    if (new Date(data.startDate) > new Date(data.endDate)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['endDate'], message: 'End date must be after or equal to start date' });
+    }
+  }
+  // Baseline: start must be <= finish
+  if (data.baselineStart && data.baselineFinish) {
+    if (new Date(data.baselineStart) > new Date(data.baselineFinish)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['baselineFinish'], message: 'Baseline finish must be after or equal to baseline start' });
+    }
+  }
+  // Actual: start must be <= finish
+  if (data.actualStart && data.actualFinish) {
+    if (new Date(data.actualStart) > new Date(data.actualFinish)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['actualFinish'], message: 'Actual finish must be after or equal to actual start' });
+    }
+  }
+  // Actual finish requires actual start
+  if (data.actualFinish && !data.actualStart) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['actualStart'], message: 'Actual start is required when actual finish is set' });
+  }
+  // Status IN_PROGRESS requires actual start
+  if (data.status === 'IN_PROGRESS' && !data.actualStart) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['actualStart'], message: 'Actual start is required when status is In Progress' });
+  }
+  // Status COMPLETED requires both actual start and actual finish
+  if (data.status === 'COMPLETED') {
+    if (!data.actualStart) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['actualStart'], message: 'Actual start is required when status is Completed' });
+    }
+    if (!data.actualFinish) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['actualFinish'], message: 'Actual finish is required when status is Completed' });
+    }
+  }
 });
 
 /**

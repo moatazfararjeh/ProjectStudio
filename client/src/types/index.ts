@@ -188,6 +188,8 @@ export interface RAIDItem {
   identifiedDate: string;
   targetDate?: string;
   closedDate?: string;
+  linkedTaskId?: string | null;
+  linkedTask?: { id: string; name: string; status: string } | null;
   createdAt: string;
   updatedAt: string;
 }

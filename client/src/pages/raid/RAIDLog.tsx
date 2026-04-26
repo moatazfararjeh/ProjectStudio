@@ -84,6 +84,14 @@ export default function RAIDLog() {
     queryFn: () => api.getRAIDItems({ projectId: selectedProject }),
   });
 
+  // Fetch tasks for the selected project (used in form task link)
+  const [formProjectId, setFormProjectId] = useState<string | undefined>();
+  const { data: projectTasks = [] } = useQuery({
+    queryKey: ['tasks', formProjectId],
+    queryFn: () => api.getTasks({ projectId: formProjectId }),
+    enabled: !!formProjectId,
+  });
+
   // Create RAID item mutation
   const createMutation = useMutation({
     mutationFn: (data: any) => api.createRAIDItem(data),
@@ -131,7 +139,8 @@ export default function RAIDLog() {
   const handleCreate = (type: RAIDType) => {
     setEditingItem(null);
     setActiveTab(type);
-    form.setFieldsValue({ type });
+    form.setFieldsValue({ type, projectId: selectedProject });
+    setFormProjectId(selectedProject);
     setIsModalOpen(true);
   };
 
@@ -141,7 +150,9 @@ export default function RAIDLog() {
       ...item,
       identifiedDate: dayjs(item.identifiedDate),
       targetDate: item.targetDate ? dayjs(item.targetDate) : undefined,
+      linkedTaskId: item.linkedTaskId ?? undefined,
     });
+    setFormProjectId(item.projectId);
     setIsModalOpen(true);
   };
 
@@ -254,6 +265,15 @@ export default function RAIDLog() {
       dataIndex: ['project', 'name'],
       key: 'project',
       width: 150,
+    },
+    {
+      title: 'Linked Task',
+      key: 'linkedTask',
+      width: 160,
+      render: (_: any, record: RAIDItem) =>
+        record.linkedTask ? (
+          <Tag icon={<LinkOutlined />} color="geekblue">{record.linkedTask.name}</Tag>
+        ) : null,
     },
     {
       title: t('common.actions'),
@@ -462,6 +482,7 @@ export default function RAIDLog() {
         onCancel={handleModalClose}
         width={700}
         confirmLoading={createMutation.isPending || updateMutation.isPending}
+        styles={{ body: { maxHeight: '70vh', overflowY: 'auto', paddingRight: 8 } }}
       >
         <Form form={form} layout="vertical" initialValues={{ type: 'RISK', status: 'OPEN' }}>
           <Form.Item name="type" label={t('raid.type')} rules={[{ required: true }]}>
@@ -484,6 +505,10 @@ export default function RAIDLog() {
                 label: project.name,
                 value: project.id,
               }))}
+              onChange={(val) => {
+                setFormProjectId(val);
+                form.setFieldValue('linkedTaskId', undefined);
+              }}
             />
           </Form.Item>
 
@@ -556,6 +581,24 @@ export default function RAIDLog() {
 
           <Form.Item name="mitigation" label={t('raid.mitigation')}>
             <TextArea rows={2} />
+          </Form.Item>
+
+          <Form.Item
+            name="linkedTaskId"
+            label="Link to Task (optional)"
+            tooltip="Optionally associate this item with an existing project task"
+          >
+            <Select
+              allowClear
+              showSearch
+              placeholder={formProjectId ? 'Select a task...' : 'Select a project first'}
+              disabled={!formProjectId}
+              optionFilterProp="label"
+              options={projectTasks.map((t: any) => ({
+                label: t.name,
+                value: t.id,
+              }))}
+            />
           </Form.Item>
 
           <Row gutter={16}>

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/auth';
+import { uploadDocxTemplate } from '../middleware/logoUpload';
 import {
   getProjects,
   getProject,
@@ -18,6 +19,16 @@ import {
   updateWeeklyHighlight,
   deleteWeeklyHighlight,
 } from '../controllers/weeklyHighlight.controller';
+import {
+  getMeetingMinutes,
+  getMeetingMinute,
+  createMeetingMinutes,
+  updateMeetingMinutes,
+  deleteMeetingMinutes,
+  exportMeetingMinutes,
+  uploadMoMTemplate,
+  deleteMoMTemplate,
+} from '../controllers/meetingMinutes.controller';
 
 const router = Router();
 
@@ -41,5 +52,18 @@ router.get('/:id/weekly-highlights', getWeeklyHighlights);
 router.post('/:id/weekly-highlights', createWeeklyHighlight);
 router.put('/:id/weekly-highlights/:hid', updateWeeklyHighlight);
 router.delete('/:id/weekly-highlights/:hid', deleteWeeklyHighlight);
+
+// Meeting Minutes
+router.get('/:id/meeting-minutes', getMeetingMinutes);
+router.post('/:id/meeting-minutes', createMeetingMinutes);
+
+// MOM template routes MUST be declared before /:mid to avoid "template" matching as :mid
+router.post('/:id/meeting-minutes/template', uploadDocxTemplate, uploadMoMTemplate);
+router.delete('/:id/meeting-minutes/template', deleteMoMTemplate);
+
+router.get('/:id/meeting-minutes/:mid', getMeetingMinute);
+router.get('/:id/meeting-minutes/:mid/export', exportMeetingMinutes);
+router.put('/:id/meeting-minutes/:mid', updateMeetingMinutes);
+router.delete('/:id/meeting-minutes/:mid', deleteMeetingMinutes);
 
 export default router;

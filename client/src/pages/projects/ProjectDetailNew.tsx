@@ -22,6 +22,7 @@ import ProjectThisWeek from '../../components/ProjectThisWeek';
 import ProjectNextWeek from '../../components/ProjectNextWeek';
 import ProjectSettingsTab from './ProjectSettingsTab';
 import ProjectWeeklyHighlights from './ProjectWeeklyHighlights';
+import ProjectMeetingMinutes from './ProjectMeetingMinutes';
 import type { Project } from '../../types';
 import { ErrorBoundary } from '../../components/ErrorBoundary';
 
@@ -89,6 +90,8 @@ export default function ProjectDetail() {
         );
       case 'weekly-highlights':
         return <ProjectWeeklyHighlights project={project} />;
+      case 'meeting-minutes':
+        return <ProjectMeetingMinutes project={project} />;
       case 'settings':
         return <ProjectSettingsTab project={project} />;
       default:

@@ -70,6 +70,12 @@ export default function ProjectRAID({ project }: ProjectRAIDProps) {
     queryFn: () => api.getUsers(),
   });
 
+  // Fetch project tasks for linking
+  const { data: projectTasks = [] } = useQuery({
+    queryKey: ['tasks', project.id],
+    queryFn: () => api.getTasks({ projectId: project.id }),
+  });
+
   // Create RAID item
   const createMutation = useMutation({
     mutationFn: (data: any) => api.createRAIDItem(data),
@@ -152,6 +158,7 @@ export default function ProjectRAID({ project }: ProjectRAIDProps) {
       probability: record.probability,
       mitigation: record.mitigation,
       comments: record.comments,
+      linkedTaskId: record.linkedTaskId ?? undefined,
       identifiedDate: record.identifiedDate ? dayjs(record.identifiedDate) : undefined,
       targetDate: record.targetDate ? dayjs(record.targetDate) : undefined,
       revisedTargetDate: record.revisedTargetDate ? dayjs(record.revisedTargetDate) : undefined,
@@ -670,6 +677,14 @@ export default function ProjectRAID({ project }: ProjectRAIDProps) {
       },
     },
     {
+      title: 'Linked Task',
+      key: 'linkedTask',
+      render: (_: any, record: any) =>
+        record.linkedTask ? (
+          <Tag color="geekblue">{record.linkedTask.name}</Tag>
+        ) : null,
+    },
+    {
       title: t('common.actions'),
       key: 'actions',
       render: (_: any, record: any) => (
@@ -969,6 +984,23 @@ export default function ProjectRAID({ project }: ProjectRAIDProps) {
 
           <Form.Item name="comments" label={t('raid.comments')}>
             <Input.TextArea rows={2} placeholder={t('raid.commentsPlaceholder')} />
+          </Form.Item>
+
+          <Form.Item
+            name="linkedTaskId"
+            label="Link to Task (optional)"
+            tooltip="Associate this RAID item with an existing task in this project"
+          >
+            <Select
+              allowClear
+              showSearch
+              placeholder="Select a task..."
+              optionFilterProp="label"
+              options={(projectTasks as any[]).map((task: any) => ({
+                label: task.name,
+                value: task.id,
+              }))}
+            />
           </Form.Item>
 
           <Row gutter={16}>

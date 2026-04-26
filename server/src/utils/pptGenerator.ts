@@ -131,6 +131,7 @@ function defineMasterLayouts(pptx: PptxGenJS, cfg: ReportTemplateConfig) {
   pptx.defineSlideMaster({
     title: 'MASTER_CONTENT_EMPTY',
     bkgd: { color: bkgdColor('contentEmpty', 'FFFFFF') },
+    slideNumber: { x: 11.9, y: 7.05, w: 1.2, h: 0.35, fontSize: 14, bold: true, color: 'FFFFFF', align: 'center' } as any,
     objects: [
       ...bgImageObjs('contentEmpty'),
       ...(!hasBgImage('contentEmpty') ? [
@@ -145,6 +146,7 @@ function defineMasterLayouts(pptx: PptxGenJS, cfg: ReportTemplateConfig) {
   pptx.defineSlideMaster({
     title: 'MASTER_TITLE_AND_CONTENT',
     bkgd: { color: bkgdColor('titleAndContent', 'FFFFFF') },
+    slideNumber: { x: 11.9, y: 7.05, w: 1.2, h: 0.35, fontSize: 14, bold: true, color: 'FFFFFF', align: 'center' } as any,
     objects: [
       ...bgImageObjs('titleAndContent'),
       ...(!hasBgImage('titleAndContent') ? [
@@ -626,15 +628,12 @@ export async function generateWeeklyReportPPT(projectId: string): Promise<Buffer
     addSlideBg(slideHL, 'weeklyHighlights');
     addSlideHeader(slideHL, (cfg as any).slideTitles?.weeklyHighlights || t('ملخص الأسبوع', 'Weekly Highlights', 'ملخص الأسبوع - Weekly Highlights'));
 
-    // Layout: two columns + right-side progress doughnut area (matching screenshot)
-    const LEFT_X   = IS_RTL ? 6.8 : 0.2;   // "this week" column
-    const RIGHT_X  = IS_RTL ? 0.2 : 6.8;   // "next week" column
+    // Layout: two equal columns filling the slide width
+    const LEFT_X   = IS_RTL ? 6.85 : 0.2;   // "this week" column
+    const RIGHT_X  = IS_RTL ? 0.2  : 6.85;  // "next week" column
     const COL_W    = 6.3;
-    const COL_Y    = 1.0;
-    const COL_H    = 5.6;
-    const CHART_X  = IS_RTL ? 0.2 : 10.1;  // donut charts area (slim right strip when LTR, left when RTL — override below)
-    const CHART_COL_X = IS_RTL ? 0.2 : 10.1;
-    const CHART_COL_W = 2.8;
+    const COL_Y    = 1.3;
+    const COL_H    = 5.5;
 
     // --- Column headers ---
     const completedTitle = t('ما تم إنجازه في الفترة السابقة (أسبوعي)', 'Completed This Week', 'ما تم إنجازه في الفترة السابقة (أسبوعي)');
@@ -662,7 +661,7 @@ export async function generateWeeklyReportPPT(projectId: string): Promise<Buffer
     });
 
     // --- Bullet items ---
-    const ITEM_Y_START = COL_Y + 0.48;
+    const ITEM_Y_START = COL_Y + 0.55;
     const ITEM_H       = 0.42;
     const BULLET       = IS_RTL ? '•' : '•';
 
@@ -693,67 +692,6 @@ export async function generateWeeklyReportPPT(projectId: string): Promise<Buffer
 
     renderItems(completedHL, LEFT_X, COL_W);
     renderItems(plannedHL, RIGHT_X, COL_W);
-
-    // --- Right-side progress metrics (doughnut-style stat cards) ---
-    const statCardX = CHART_COL_X;
-    const statCardW = CHART_COL_W;
-
-    // Actual progress card
-    slideHL.addShape('roundRect' as any, {
-      x: statCardX, y: 1.0, w: statCardW, h: 2.0,
-      fill: { color: THEME.cardBg },
-      shadow: { type: 'outer', blur: 5, offset: 2, color: '00000018' },
-      rectRadius: 0.1,
-    });
-    slideHL.addText(`${actualProgress.toFixed(1)}%`, {
-      x: statCardX, y: 1.1, w: statCardW, h: 0.9,
-      fontSize: 32, bold: true, color: THEME.success, align: 'center',
-    });
-    slideHL.addText(t('نسبة الإنجاز\nالفعلية', 'Actual\nProgress', 'نسبة الإنجاز\nالفعلية'), {
-      x: statCardX, y: 2.0, w: statCardW, h: 0.9,
-      fontSize: 10, color: THEME.text, align: 'center', rtlMode: IS_RTL,
-    });
-
-    // Planned progress card
-    slideHL.addShape('roundRect' as any, {
-      x: statCardX, y: 3.15, w: statCardW, h: 2.0,
-      fill: { color: THEME.cardBg },
-      shadow: { type: 'outer', blur: 5, offset: 2, color: '00000018' },
-      rectRadius: 0.1,
-    });
-    slideHL.addText(`${plannedProgress.toFixed(1)}%`, {
-      x: statCardX, y: 3.25, w: statCardW, h: 0.9,
-      fontSize: 32, bold: true, color: THEME.info, align: 'center',
-    });
-    slideHL.addText(t('نسبة الإنجاز\nالمخططة', 'Planned\nProgress', 'نسبة الإنجاز\nالمخططة'), {
-      x: statCardX, y: 4.15, w: statCardW, h: 0.9,
-      fontSize: 10, color: THEME.text, align: 'center', rtlMode: IS_RTL,
-    });
-
-    // Variance badge
-    const varVal = Math.abs(plannedProgress - actualProgress).toFixed(1);
-    const varColor = plannedProgress > actualProgress + 5 ? THEME.danger : plannedProgress > actualProgress ? THEME.warning : THEME.success;
-    slideHL.addShape('roundRect' as any, {
-      x: statCardX, y: 5.3, w: statCardW, h: 0.8,
-      fill: { color: varColor }, rectRadius: 0.08,
-    });
-    slideHL.addText(`${t('مؤشر التباين', 'Variance', 'مؤشر التباين')}\n${varVal}%`, {
-      x: statCardX, y: 5.3, w: statCardW, h: 0.8,
-      fontSize: 11, bold: true, color: THEME.white, align: 'center', valign: 'middle',
-    });
-
-    // Legend at bottom
-    const legendY = 6.6;
-    const legendItems = [
-      { label: t('على المسار', 'On Track', 'On Track'), color: THEME.success },
-      { label: t('مخاطر محتملة', 'At Risk', 'At Risk'), color: THEME.warning },
-      { label: t('متأخر', 'Delayed', 'Delayed'), color: THEME.danger },
-    ];
-    legendItems.forEach((item, i) => {
-      const lx = 1.0 + i * 3.8;
-      slideHL.addShape('rect' as any, { x: lx, y: legendY, w: 0.25, h: 0.18, fill: { color: item.color } });
-      slideHL.addText(item.label, { x: lx + 0.3, y: legendY, w: 3.0, h: 0.18, fontSize: 9, color: THEME.text });
-    });
 
   } // end weeklyHighlights
 
@@ -849,7 +787,7 @@ export async function generateWeeklyReportPPT(projectId: string): Promise<Buffer
           );
         });
         slideM.addTable(msRows, {
-          x: 0.15, y: 1.0, w: 13.0,
+          x: 0.15, y: 1.3, w: 13.0,
           colW: IS_RTL ? [1.3, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.1, 3.0, 0.4] : [0.4, 3.0, 1.1, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.3],
           rowH: 0.32,
           border: { pt: 0.5, color: THEME.tableBorder },
@@ -919,7 +857,7 @@ export async function generateWeeklyReportPPT(projectId: string): Promise<Buffer
     });
 
     slide4.addTable(rows4, {
-      x: 0.3, y: 1.0, w: 12.7,
+      x: 0.3, y: 1.3, w: 12.7,
       colW: IS_RTL ? [2.4, 3.5, 6.3, 0.5] : [0.5, 6.3, 3.5, 2.4],
       rowH: 0.32,
       border: { pt: 0.5, color: THEME.tableBorder },
@@ -934,7 +872,7 @@ export async function generateWeeklyReportPPT(projectId: string): Promise<Buffer
     fill: { color: THEME.success }, rectRadius: 0.05,
   });
   slide4.addText(t(`الإنجاز الفعلي ${actualProgress.toFixed(1)}%`, `Actual Progress ${actualProgress.toFixed(1)}%`, `الإنجاز الفعلي ${actualProgress.toFixed(1)}% / Actual Progress`), {
-    x: 0.5, y: bY4, w: 12, h: 0.3, fontSize: 9, bold: true, color: THEME.white, align: 'center', valign: 'middle',
+    x: 0.5, y: bY4, w: 12, h: 0.3, fontSize: 9, bold: true, color: THEME.dark, align: 'center', valign: 'middle',
   });
 
   } // end weeklyProgress
@@ -974,7 +912,7 @@ export async function generateWeeklyReportPPT(projectId: string): Promise<Buffer
     });
 
     slide5.addTable(rows5, {
-      x: 0.3, y: 1.0, w: 12.7,
+      x: 0.3, y: 1.3, w: 12.7,
       colW: IS_RTL ? [1.7, 1.7, 3.0, 5.8, 0.5] : [0.5, 5.8, 3.0, 1.7, 1.7],
       rowH: 0.32,
       border: { pt: 0.5, color: THEME.tableBorder },
@@ -989,7 +927,7 @@ export async function generateWeeklyReportPPT(projectId: string): Promise<Buffer
     fill: { color: THEME.info }, rectRadius: 0.05,
   });
   slide5.addText(t(`الإنجاز المخطط ${plannedProgress.toFixed(1)}%`, `Planned Progress ${plannedProgress.toFixed(1)}%`, `الإنجاز المخطط ${plannedProgress.toFixed(1)}% / Planned Progress`), {
-    x: 0.5, y: bY5, w: 12, h: 0.3, fontSize: 9, bold: true, color: THEME.white, align: 'center', valign: 'middle',
+    x: 0.5, y: bY5, w: 12, h: 0.3, fontSize: 9, bold: true, color: THEME.dark, align: 'center', valign: 'middle',
   });
 
   } // end nextWeek
@@ -1187,7 +1125,7 @@ export async function generateWeeklyReportPPT(projectId: string): Promise<Buffer
     });
 
     slideR.addTable(riskRows, {
-      x: 0.15, y: 1.0, w: 13.0,
+      x: 0.15, y: 1.3, w: 13.0,
       colW: IS_RTL ? [1.0, 1.3, 1.2, 2.2, 0.9, 1.0, 0.8, 1.0, 1.0, 2.2] : [2.2, 1.0, 1.0, 0.8, 1.0, 0.9, 2.2, 1.2, 1.3, 1.0],
       rowH: 0.42,
       border: { pt: 0.5, color: THEME.tableBorder },

@@ -36,3 +36,28 @@ export const uploadLogo = multer({
     fileSize: 5 * 1024 * 1024, // 5MB max
   },
 }).single('logo');
+
+// ── .docx template upload ───────────────────────────────────────────────────
+const docxStorage = multer.diskStorage({
+  destination: function (_req, _file, cb) {
+    const dir = path.join(__dirname, '../../public/mom-templates');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: function (_req, file, cb) {
+    // Temporary name; the controller renames it to a stable project-scoped name
+    cb(null, `tmp_${Date.now()}${path.extname(file.originalname)}`);
+  },
+});
+
+const docxFileFilter = (_req: any, file: Express.Multer.File, cb: any) => {
+  const ext = path.extname(file.originalname).toLowerCase();
+  if (ext === '.docx') cb(null, true);
+  else cb(new Error('Only .docx files are allowed'), false);
+};
+
+export const uploadDocxTemplate = multer({
+  storage: docxStorage,
+  fileFilter: docxFileFilter,
+  limits: { fileSize: 20 * 1024 * 1024 }, // 20 MB
+}).single('template');
