@@ -21,6 +21,7 @@ function buildTheme(cfg: ReportTemplateConfig) {
     success: cfg.colors.success,
     warning: cfg.colors.warning,
     danger: cfg.colors.danger,
+    headerTitle: (cfg.colors as any).headerTitle || 'FFFFFF',
     info: '2563EB',
     headerBg: '0F172A',
     tableBorder: 'CBD5E1',
@@ -41,7 +42,7 @@ let IS_RTL = true;
 function addSlideHeader(slide: any, title: string) {
   slide.addText(title, {
     x: 1.0, y: 0.1, w: 11.2, h: 0.6,
-    fontSize: 22, bold: true, color: THEME.white,
+    fontSize: 22, bold: true, color: THEME.headerTitle,
     align: IS_RTL ? 'right' : 'left',
     rtlMode: IS_RTL,
   });
@@ -99,15 +100,21 @@ function defineMasterLayouts(pptx: PptxGenJS, cfg: ReportTemplateConfig) {
     return objs;
   };
 
-  // ── COVER: full primary color (or custom bg), accent bars top/bottom, large logos ──
+  // Returns true if a background image exists for this layout
+  const hasBgImage = (layoutKey: string): boolean => {
+    const url = (cfg as any).header?.[layoutKey]?.imageUrl;
+    if (!url) return false;
+    return fs.existsSync(resolvePath(url));
+  };
+
+  // ── COVER: full primary color (or custom bg), large logos ──
   pptx.defineSlideMaster({
     title: 'MASTER_COVER',
     bkgd: { color: THEME.primary },
     objects: [
-      // Full-slide primary color fill to eliminate any white edges
-      { rect: { x: 0, y: 0, w: '100%', h: '100%', fill: { color: THEME.primary } } },
+      ...(!hasBgImage('cover') ? [{ rect: { x: 0, y: 0, w: '100%', h: '100%', fill: { color: THEME.primary } } }] : []),
       ...bgImageObjs('cover'),
-      ...logoCover(),
+      ...(!hasBgImage('cover') ? logoCover() : []),
     ],
   });
 
@@ -120,38 +127,44 @@ function defineMasterLayouts(pptx: PptxGenJS, cfg: ReportTemplateConfig) {
     ],
   });
 
-  // ── CONTENT EMPTY: primary header bar, no title text, small logos ─────────
+  // ── CONTENT EMPTY: primary header bar when no image, else image only ─────────
   pptx.defineSlideMaster({
     title: 'MASTER_CONTENT_EMPTY',
     bkgd: { color: bkgdColor('contentEmpty', 'FFFFFF') },
     objects: [
       ...bgImageObjs('contentEmpty'),
-      { rect: { x: 0, y: 0,   w: '100%', h: 0.8,  fill: { color: THEME.primary } } },
-      { rect: { x: 0, y: 0.8, w: '100%', h: 0.04, fill: { color: THEME.accent } } },
-      ...logoSmall(),
+      ...(!hasBgImage('contentEmpty') ? [
+        { rect: { x: 0, y: 0,   w: '100%', h: 0.8,  fill: { color: THEME.primary } } },
+        { rect: { x: 0, y: 0.8, w: '100%', h: 0.04, fill: { color: THEME.accent } } },
+        ...logoSmall(),
+      ] : []),
     ],
   });
 
-  // ── TITLE AND CONTENT: header bar + accent rule, white bg, small logos ────
+  // ── TITLE AND CONTENT: header bar when no image, else image only ────
   pptx.defineSlideMaster({
     title: 'MASTER_TITLE_AND_CONTENT',
     bkgd: { color: bkgdColor('titleAndContent', 'FFFFFF') },
     objects: [
       ...bgImageObjs('titleAndContent'),
-      { rect: { x: 0, y: 0,   w: '100%', h: 0.8,  fill: { color: THEME.primary } } },
-      { rect: { x: 0, y: 0.8, w: '100%', h: 0.04, fill: { color: THEME.accent } } },
-      ...logoSmall(),
+      ...(!hasBgImage('titleAndContent') ? [
+        { rect: { x: 0, y: 0,   w: '100%', h: 0.8,  fill: { color: THEME.primary } } },
+        { rect: { x: 0, y: 0.8, w: '100%', h: 0.04, fill: { color: THEME.accent } } },
+        ...logoSmall(),
+      ] : []),
     ],
   });
 
-  // ── SECTION TITLE: secondary color bg (or custom bg), thin accent bars ────
+  // ── SECTION TITLE: accent bars when no image, else image only ────
   pptx.defineSlideMaster({
     title: 'MASTER_SECTION_TITLE',
     bkgd: { color: bkgdColor('sectionTitle', THEME.secondary) },
     objects: [
       ...bgImageObjs('sectionTitle'),
-      { rect: { x: 0, y: 0,    w: '100%', h: 0.12, fill: { color: THEME.accent } } },
-      { rect: { x: 0, y: 7.38, w: '100%', h: 0.12, fill: { color: THEME.accent } } },
+      ...(!hasBgImage('sectionTitle') ? [
+        { rect: { x: 0, y: 0,    w: '100%', h: 0.12, fill: { color: THEME.accent } } },
+        { rect: { x: 0, y: 7.38, w: '100%', h: 0.12, fill: { color: THEME.accent } } },
+      ] : []),
     ],
   });
 }
@@ -425,7 +438,7 @@ export async function generateWeeklyReportPPT(projectId: string): Promise<Buffer
   if (cfg.slides.agenda) {
     const slide2 = createSlide(masterForSlide('agenda'));
     addSlideBg(slide2, 'agenda');
-    addSlideHeader(slide2, t('جدول الأعمال', 'Agenda', 'جدول الأعمال - Agenda'));
+    addSlideHeader(slide2, (cfg as any).slideTitles?.agenda || t('جدول الأعمال', 'Agenda', 'جدول الأعمال - Agenda'));
 
   const agendaItems = [
     { num: '01', arTitle: 'ملخص تنفيذي',          enTitle: 'Executive Summary' },
@@ -500,7 +513,7 @@ export async function generateWeeklyReportPPT(projectId: string): Promise<Buffer
   if (cfg.slides.executiveSummary) {
     const slide3 = createSlide(masterForSlide('executiveSummary'));
     addSlideBg(slide3, 'executiveSummary');
-    addSlideHeader(slide3, t('ملخص تنفيذي', 'Executive Summary', 'ملخص تنفيذي - Executive Summary'));
+    addSlideHeader(slide3, (cfg as any).slideTitles?.executiveSummary || t('ملخص تنفيذي', 'Executive Summary', 'ملخص تنفيذي - Executive Summary'));
 
   // Progress cards row
   const cards = [
@@ -597,14 +610,14 @@ export async function generateWeeklyReportPPT(projectId: string): Promise<Buffer
   //  MILESTONES after Executive Summary (Section 01)
   // ============================================================
   if (cfg.slides.milestones) {
-    const MILESTONES_PER_PAGE = cfg.milestonesPerPage || 10;
+    const MILESTONES_PER_PAGE = cfg.milestonesPerPage || 14;
     const milestonePages = Math.max(1, Math.ceil(milestones.length / MILESTONES_PER_PAGE));
 
     for (let page = 0; page < milestonePages; page++) {
       const slideM = createSlide(masterForSlide('milestones'));
       addSlideBg(slideM, 'milestones');
       const pageLabel = milestonePages > 1 ? ` (${page + 1}/${milestonePages})` : '';
-      addSlideHeader(slideM, `المعالم الرئيسية - Key Milestones${pageLabel}`);
+      addSlideHeader(slideM, ((cfg as any).slideTitles?.milestones || t('المعالم الرئيسية', 'Key Milestones', 'المعالم الرئيسية - Key Milestones')) + pageLabel);
 
       const milestonesOnPage = milestones.slice(
         page * MILESTONES_PER_PAGE,
@@ -686,8 +699,8 @@ export async function generateWeeklyReportPPT(projectId: string): Promise<Buffer
         });
         slideM.addTable(msRows, {
           x: 0.15, y: 1.0, w: 13.0,
-          colW: IS_RTL ? [1.1, 1.4, 1.4, 1.4, 1.4, 1.4, 1.4, 1.2, 2.3, 0.5] : [0.4, 2.4, 1.1, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.1],
-          rowH: 0.38,
+          colW: IS_RTL ? [1.3, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.1, 3.0, 0.4] : [0.4, 3.0, 1.1, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.3],
+          rowH: 0.32,
           border: { pt: 0.5, color: THEME.tableBorder },
         });
       }
@@ -724,7 +737,7 @@ export async function generateWeeklyReportPPT(projectId: string): Promise<Buffer
   if (cfg.slides.weeklyProgress) {
     const slide4 = createSlide(masterForSlide('weeklyProgress'));
     addSlideBg(slide4, 'weeklyProgress');
-    addSlideHeader(slide4, t('ما تم إنجازه هذا الأسبوع', 'This Week Achievements', 'ما تم إنجازه هذا الأسبوع - This Week Achievements'));
+    addSlideHeader(slide4, (cfg as any).slideTitles?.weeklyProgress || t('ما تم إنجازه هذا الأسبوع', 'This Week Achievements', 'ما تم إنجازه هذا الأسبوع - This Week Achievements'));
 
   if (completedThisWeek.length === 0) {
     slide4.addText(t('لا توجد مهام مكتملة هذا الأسبوع', 'No tasks completed this week', 'لا توجد مهام مكتملة هذا الأسبوع / No tasks completed this week'), {
@@ -740,7 +753,7 @@ export async function generateWeeklyReportPPT(projectId: string): Promise<Buffer
     const rows4: any[][] = [tw4Header];
 
     let rowNum4 = 1;
-    completedThisWeek.slice(0, 20).forEach((task) => {
+    completedThisWeek.slice(0, cfg.thisWeekPerPage || 20).forEach((task) => {
         const assignee = task.assignedTo ? `${task.assignedTo.firstName} ${task.assignedTo.lastName}` : '-';
         const rowFill = rowNum4 % 2 === 0 ? {} : { fill: { color: THEME.tableAltRow } };
         const numCell4   = dataCell(rowNum4.toString(), rowFill);
@@ -781,7 +794,7 @@ export async function generateWeeklyReportPPT(projectId: string): Promise<Buffer
   if ((cfg.slides as any).nextWeek) {
     const slide5 = createSlide(masterForSlide('nextWeek'));
     addSlideBg(slide5, 'nextWeek');
-    addSlideHeader(slide5, t('خطة الأسبوع القادم', 'Next Week Plan', 'خطة الأسبوع القادم - Next Week Plan'));
+    addSlideHeader(slide5, (cfg as any).slideTitles?.nextWeek || t('خطة الأسبوع القادم', 'Next Week Plan', 'خطة الأسبوع القادم - Next Week Plan'));
 
   if (plannedNextWeek.length === 0) {
     slide5.addText(t('لا توجد مهام مخططة للأسبوع القادم', 'No tasks planned for next week', 'لا توجد مهام مخططة للأسبوع القادم / No tasks planned for next week'), {
@@ -795,7 +808,7 @@ export async function generateWeeklyReportPPT(projectId: string): Promise<Buffer
       ? [headerCell(t('الموعد النهائي', 'Due Date')), headerCell(t('تاريخ البدء', 'Start Date')), headerCell(t('المسؤول', 'Assignee')), headerCell(t('المهمة', 'Task')), headerCell('#')]
       : [headerCell('#'), headerCell('Task'), headerCell('Assignee'), headerCell('Start Date'), headerCell('Due Date')];
     const rows5: any[][] = [tw5Header];
-    plannedNextWeek.slice(0, 18).forEach((task, idx) => {
+    plannedNextWeek.slice(0, cfg.nextWeekPerPage || 18).forEach((task, idx) => {
       const assignee = task.assignedTo ? `${task.assignedTo.firstName} ${task.assignedTo.lastName}` : '-';
       const rowFill = idx % 2 === 0 ? {} : { fill: { color: THEME.tableAltRow } };
       const numCell5   = dataCell((idx + 1).toString(), rowFill);
@@ -954,7 +967,7 @@ export async function generateWeeklyReportPPT(projectId: string): Promise<Buffer
       const slideR = createSlide(masterForSlide('risksAndChallenges'));
       addSlideBg(slideR, 'risksAndChallenges');
       const pageLabel = riskPages > 1 ? ` (${page + 1}/${riskPages})` : '';
-      addSlideHeader(slideR, t('المخاطر / التحديات', 'Risks & Challenges', 'المخاطر / التحديات - Risks & Challenges') + pageLabel);
+      addSlideHeader(slideR, ((cfg as any).slideTitles?.risksAndChallenges || t('المخاطر / التحديات', 'Risks & Challenges', 'المخاطر / التحديات - Risks & Challenges')) + pageLabel);
 
     const risksOnPage = activeRisks.slice(page * RISKS_PER_PAGE, (page + 1) * RISKS_PER_PAGE);
 

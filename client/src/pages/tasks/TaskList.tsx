@@ -111,11 +111,17 @@ export default function TaskList() {
     enabled: !!formProjectId,
   });
 
-  // Get available assignees (project members only)
-  const availableAssignees = selectedProjectDetails?.members?.filter((member: any) => member.user).map((member: any) => ({
-    label: `${member.user.firstName} ${member.user.lastName}`,
-    value: member.user.id,
-  })) || [];
+  // Get available assignees from all project team members
+  const availableAssignees = selectedProjectDetails?.members?.map((member: any) => {
+    if (member.user) {
+      return {
+        label: `${member.user.firstName} ${member.user.lastName}`,
+        value: member.user.id,
+      };
+    }
+    const name = member.memberName || member.memberEmail || 'Unknown';
+    return { label: name, value: `__name__${name}` };
+  }) || [];
 
   // Create task mutation
   const createMutation = useMutation({
@@ -197,6 +203,12 @@ export default function TaskList() {
       };
       delete taskData.dates;
 
+      // Handle name-only team members (non-portal users)
+      if (taskData.assigneeId && String(taskData.assigneeId).startsWith('__name__')) {
+        taskData.assigneeName = String(taskData.assigneeId).replace('__name__', '');
+        taskData.assigneeId = undefined;
+      }
+
       if (editingTask) {
         updateMutation.mutate({ id: editingTask.id, data: taskData });
       } else {
@@ -275,11 +287,16 @@ export default function TaskList() {
       dataIndex: 'assignee',
       key: 'assignee',
       width: 150,
-      render: (assignee: any) =>
+      render: (assignee: any, record: any) =>
         assignee ? (
           <Space>
             <Avatar size="small" icon={<UserOutlined />} />
             <Text>{`${assignee.firstName} ${assignee.lastName}`}</Text>
+          </Space>
+        ) : record.assigneeName ? (
+          <Space>
+            <Avatar size="small" icon={<UserOutlined />} />
+            <Text>{record.assigneeName}</Text>
           </Space>
         ) : (
           '-'

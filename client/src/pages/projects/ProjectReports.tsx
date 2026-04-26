@@ -1,7 +1,6 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useReactToPrint } from 'react-to-print';
 import {
   Card,
   Button,
@@ -15,7 +14,6 @@ import {
   App,
 } from 'antd';
 import {
-  FilePdfOutlined,
   FileImageOutlined,
   ClockCircleOutlined,
   CheckCircleOutlined,
@@ -33,7 +31,6 @@ interface ProjectReportsProps {
 
 export default function ProjectReports({ project }: ProjectReportsProps) {
   const { t } = useTranslation();
-  const printRef = useRef<HTMLDivElement>(null);
   const { message } = App.useApp();
   const [isExporting, setIsExporting] = useState(false);
   const queryClient = useQueryClient();
@@ -93,10 +90,6 @@ export default function ProjectReports({ project }: ProjectReportsProps) {
     }
   };
 
-  const handlePrint = useReactToPrint({
-    contentRef: printRef as any,
-  });
-
   // Task columns for table
   const taskColumns = [
     {
@@ -118,8 +111,10 @@ export default function ProjectReports({ project }: ProjectReportsProps) {
       title: t('tasks.assignee'),
       dataIndex: ['assignedTo', 'firstName'],
       key: 'assignee',
-      render: (_: any, record: any) => 
-        record.assignedTo ? `${record.assignedTo.firstName} ${record.assignedTo.lastName}` : '-',
+      render: (_: any, record: any) =>
+        record.assignedTo
+          ? `${record.assignedTo.firstName} ${record.assignedTo.lastName}`
+          : record.assigneeName || '-',
     },
     {
       title: t('tasks.progress'),
@@ -143,18 +138,11 @@ export default function ProjectReports({ project }: ProjectReportsProps) {
             >
               Export PowerPoint
             </Button>
-            <Button
-              type="primary"
-              icon={<FilePdfOutlined />}
-              onClick={handlePrint}
-            >
-              {t('reports.export')} PDF
-            </Button>
           </Space>
         }
       >
         {/* Printable Content */}
-        <div ref={printRef} style={{ padding: 20 }}>
+        <div style={{ padding: 20 }}>
           {/* Header */}
           <div style={{ marginBottom: 32 }}>
             <Title level={2} style={{ marginBottom: 4 }}>{project.name}</Title>

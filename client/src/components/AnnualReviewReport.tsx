@@ -1,7 +1,6 @@
 import { useRef } from 'react';
-import { Card, Typography, Row, Col, Table, Tag, Divider, Button, Space } from 'antd';
-import { PrinterOutlined, DownloadOutlined, ArrowUpOutlined, ArrowDownOutlined, DollarOutlined, RiseOutlined, LineChartOutlined } from '@ant-design/icons';
-import { useReactToPrint } from 'react-to-print';
+import { Card, Typography, Row, Col, Table, Tag, Divider, Space } from 'antd';
+import { ArrowUpOutlined, ArrowDownOutlined, DollarOutlined, RiseOutlined, LineChartOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { useTranslation } from 'react-i18next';
 
@@ -61,11 +60,6 @@ export default function AnnualReviewReport({ data }: AnnualReviewReportProps) {
   const { t, i18n } = useTranslation();
   const isRTL = i18n.language === 'ar';
   const componentRef = useRef<HTMLDivElement>(null);
-
-  const handlePrint = useReactToPrint({
-    contentRef: componentRef,
-    documentTitle: `Annual-Review-${data.accountName}-${data.reviewYear}`,
-  });
 
   const projectColumns = [
     {
@@ -130,15 +124,6 @@ export default function AnnualReviewReport({ data }: AnnualReviewReportProps) {
 
   return (
     <div>
-      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-        <Button icon={<PrinterOutlined />} onClick={handlePrint}>
-          {t('common.print')}
-        </Button>
-        <Button icon={<DownloadOutlined />} type="primary" onClick={handlePrint}>
-          {t('common.download')} PDF
-        </Button>
-      </div>
-
       <div ref={componentRef} style={{ padding: 24, backgroundColor: 'white', direction: isRTL ? 'rtl' : 'ltr' }}>
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: 32 }}>

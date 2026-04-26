@@ -3,20 +3,18 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Card,
   Form,
-  Input,
   Switch,
   Button,
   Row,
   Col,
   Typography,
-  Divider,
   ColorPicker,
   InputNumber,
+  Input,
   Radio,
   Space,
   Spin,
   App,
-  Collapse,
   Tag,
   Tooltip,
   Upload,
@@ -24,30 +22,27 @@ import {
   Tabs,
   Badge,
   Alert,
+  Popconfirm,
 } from 'antd';
 import {
   SaveOutlined,
   UndoOutlined,
   EyeOutlined,
-  FileImageOutlined,
   BgColorsOutlined,
   AppstoreOutlined,
   SettingOutlined,
   FilePptOutlined,
-  DragOutlined,
   DeleteOutlined,
-  CloseCircleOutlined,
   PictureOutlined,
   LayoutOutlined,
   CheckCircleOutlined,
   StopOutlined,
+  EditOutlined,
 } from '@ant-design/icons';
-import { DndContext, closestCenter } from '@dnd-kit/core';
-import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 import api from '../../lib/api';
 import type { Project } from '../../types';
-const { Title, Text, Paragraph } = Typography;
+
+const { Text } = Typography;
 
 interface ReportTemplateSettingsProps {
   project: Project;
@@ -68,6 +63,7 @@ const DEFAULT_TEMPLATE = {
     success: '16A34A',
     warning: 'F59E0B',
     danger: 'DC2626',
+    headerTitle: 'FFFFFF',
   },
   slides: {
     titlePage: true,
@@ -79,16 +75,22 @@ const DEFAULT_TEMPLATE = {
     risksAndChallenges: true,
   },
   language: 'bilingual' as const,
-  showVarianceIndicator: true,
-  showProgressBars: true,
   milestonesPerPage: 10,
   risksPerPage: 8,
   timelinePerPage: 10,
+  thisWeekPerPage: 20,
+  nextWeekPerPage: 18,
+  slideTitles: {
+    agenda:             '',
+    executiveSummary:   '',
+    weeklyProgress:     '',
+    nextWeek:           '',
+    milestones:         '',
+    risksAndChallenges: '',
+  } as Record<string, string>,
   logoRepeat: 'first' as 'first' | 'all',
 };
 
-
-import { PlusOutlined } from '@ant-design/icons';
 
 const MASTER_LAYOUT_OPTIONS = [
   { value: 'titleAndContent', label: 'Title & Content' },
@@ -102,46 +104,23 @@ const MASTER_LAYOUT_COLORS: Record<string, string> = {
   titleAndContent: 'blue', sectionTitle: 'geekblue',
 };
 
-const DEFAULT_SLIDES = [
-  { key: 'titlePage',          label: 'Title Page',        labelAr: 'صفحة العنوان',     desc: 'Project name & report date',       masterLayout: 'cover' },
-  { key: 'agenda',             label: 'Agenda',            labelAr: 'جدول الأعمال',     desc: 'Meeting agenda items',             masterLayout: 'sectionTitle' },
-  { key: 'executiveSummary',   label: 'Dashboard',         labelAr: 'لوحة البيانات',    desc: 'Progress cards & KPI statistics',  masterLayout: 'titleAndContent' },
-  { key: 'weeklyProgress',     label: 'This Week',         labelAr: 'ما تم إنجازه',     desc: 'Completed tasks this week',        masterLayout: 'titleAndContent' },
-  { key: 'nextWeek',           label: 'Next Week',         labelAr: 'خطة الأسبوع القادم', desc: 'Planned tasks next week',         masterLayout: 'titleAndContent' },
-  { key: 'milestones',         label: 'Key Milestones',    labelAr: 'المعالم الرئيسية', desc: 'Milestones table with variance',   masterLayout: 'contentEmpty' },
-  { key: 'risksAndChallenges', label: 'Risks & Challenges',labelAr: 'المخاطر والتحديات',desc: 'RAID log table',                   masterLayout: 'contentEmpty' },
-];
-
-const COLOR_FIELDS = [
-  { key: 'accent', label: 'Accent', labelAr: 'التمييز' },
-  { key: 'success', label: 'Success', labelAr: 'النجاح' },
-  { key: 'warning', label: 'Warning', labelAr: 'التحذير' },
-  { key: 'danger', label: 'Danger', labelAr: 'الخطر' },
-];
-
 export default function ReportTemplateSettings({ project }: ReportTemplateSettingsProps) {
   const DEFAULT_SLIDES = [
-    { key: 'titlePage',          label: 'Title Page',        labelAr: 'صفحة العنوان',      desc: 'Project name & report date',      masterLayout: 'cover' },
-    { key: 'agenda',             label: 'Agenda',            labelAr: 'جدول الأعمال',      desc: 'Meeting agenda items',            masterLayout: 'sectionTitle' },
-    { key: 'executiveSummary',   label: 'Dashboard',         labelAr: 'لوحة البيانات',     desc: 'Progress cards & statistics',     masterLayout: 'titleAndContent' },
-    { key: 'weeklyProgress',     label: 'This Week',         labelAr: 'ما تم إنجازه',      desc: 'Completed tasks this week',       masterLayout: 'titleAndContent' },
-    { key: 'nextWeek',           label: 'Next Week',         labelAr: 'خطة الأسبوع القادم', desc: 'Planned tasks next week',        masterLayout: 'titleAndContent' },
-    { key: 'milestones',         label: 'Key Milestones',    labelAr: 'المعالم الرئيسية', desc: 'Milestones table with variance',  masterLayout: 'contentEmpty' },
-    { key: 'risksAndChallenges', label: 'Risks & Challenges',labelAr: 'المخاطر والتحديات',desc: 'RAID log table',                  masterLayout: 'contentEmpty' },
+    { key: 'titlePage',          label: 'Title Page',        labelAr: '',      desc: 'Project name & report date',      masterLayout: 'cover' },
+    { key: 'agenda',             label: 'Agenda',            labelAr: '',      desc: 'Meeting agenda items',            masterLayout: 'sectionTitle' },
+    { key: 'executiveSummary',   label: 'Dashboard',         labelAr: '',      desc: 'Progress cards & statistics',     masterLayout: 'titleAndContent' },
+    { key: 'weeklyProgress',     label: 'This Week',         labelAr: '',      desc: 'Completed tasks this week',       masterLayout: 'titleAndContent' },
+    { key: 'nextWeek',           label: 'Next Week',         labelAr: '',      desc: 'Planned tasks next week',        masterLayout: 'titleAndContent' },
+    { key: 'milestones',         label: 'Key Milestones',    labelAr: '',      desc: 'Milestones table with variance',  masterLayout: 'contentEmpty' },
+    { key: 'risksAndChallenges', label: 'Risks & Challenges',labelAr: '',      desc: 'RAID log table',                  masterLayout: 'contentEmpty' },
   ];
   const [slideInfo, setSlideInfo] = useState(DEFAULT_SLIDES);
-  const [newSlide, setNewSlide] = useState({ key: '', label: '', labelAr: '', desc: '', masterLayout: 'titleAndContent' });
 
   // Layout banner images (one image per master layout type)
   type LayoutType = 'cover' | 'blank' | 'contentEmpty' | 'titleAndContent' | 'sectionTitle';
   const LAYOUT_KEYS: LayoutType[] = ['cover', 'blank', 'contentEmpty', 'titleAndContent', 'sectionTitle'];
   const [layoutImages, setLayoutImages] = useState<Record<LayoutType, string>>({ cover: '', blank: '', contentEmpty: '', titleAndContent: '', sectionTitle: '' });
   const [uploadingLayout, setUploadingLayout] = useState<Record<string, boolean>>({});
-
-  // Per-slide background images
-  const SLIDE_KEYS = ['titlePage', 'agenda', 'executiveSummary', 'weeklyProgress', 'nextWeek', 'milestones', 'risksAndChallenges'];
-  const [slideImages, setSlideImages] = useState<Record<string, string>>(Object.fromEntries(SLIDE_KEYS.map(k => [k, ''])));
-  const [uploadingSlide, setUploadingSlide] = useState<Record<string, boolean>>({});
   const { message } = App.useApp();
   const queryClient = useQueryClient();
   const [form] = Form.useForm();
@@ -161,11 +140,17 @@ export default function ReportTemplateSettings({ project }: ReportTemplateSettin
         logoUrlLeft: template.logoUrlLeft || '',
         logoUrlRight: template.logoUrlRight || '',
         language: template.language || 'bilingual',
-        showVarianceIndicator: template.showVarianceIndicator ?? true,
-        showProgressBars: template.showProgressBars ?? true,
         milestonesPerPage: template.milestonesPerPage || 10,
         risksPerPage: template.risksPerPage || 8,
         timelinePerPage: template.timelinePerPage || 10,
+        thisWeekPerPage: (template as any).thisWeekPerPage || 20,
+        nextWeekPerPage: (template as any).nextWeekPerPage || 18,
+        slideTitle_agenda:             (template as any).slideTitles?.agenda             || '',
+        slideTitle_executiveSummary:   (template as any).slideTitles?.executiveSummary   || '',
+        slideTitle_weeklyProgress:     (template as any).slideTitles?.weeklyProgress     || '',
+        slideTitle_nextWeek:           (template as any).slideTitles?.nextWeek           || '',
+        slideTitle_milestones:         (template as any).slideTitles?.milestones         || '',
+        slideTitle_risksAndChallenges: (template as any).slideTitles?.risksAndChallenges || '',
       });
       // Load layout banner images from template.header
       if (template.header) {
@@ -173,13 +158,6 @@ export default function ReportTemplateSettings({ project }: ReportTemplateSettin
           ...prev,
           ...Object.fromEntries(LAYOUT_KEYS.map(k => [k, (template.header as any)?.[k]?.imageUrl || ''])),
         }) as Record<LayoutType, string>);
-      }
-      // Load per-slide background images
-      if ((template as any).slideImages) {
-        setSlideImages(prev => ({
-          ...prev,
-          ...Object.fromEntries(SLIDE_KEYS.map(k => [k, ((template as any).slideImages)?.[k] || ''])),
-        }));
       }
       // Merge saved slideLayouts back into slideInfo
       if ((template as any).slideLayouts) {
@@ -236,15 +214,22 @@ export default function ReportTemplateSettings({ project }: ReportTemplateSettin
       logoUrlLeft: formValues.logoUrlLeft,
       logoUrlRight: formValues.logoUrlRight,
       language: formValues.language,
-      showVarianceIndicator: formValues.showVarianceIndicator,
-      showProgressBars: formValues.showProgressBars,
       milestonesPerPage: formValues.milestonesPerPage,
       risksPerPage: formValues.risksPerPage,
       timelinePerPage: formValues.timelinePerPage,
+      thisWeekPerPage: formValues.thisWeekPerPage,
+      nextWeekPerPage: formValues.nextWeekPerPage,
+      slideTitles: {
+        agenda:             formValues.slideTitle_agenda             || '',
+        executiveSummary:   formValues.slideTitle_executiveSummary   || '',
+        weeklyProgress:     formValues.slideTitle_weeklyProgress     || '',
+        nextWeek:           formValues.slideTitle_nextWeek           || '',
+        milestones:         formValues.slideTitle_milestones         || '',
+        risksAndChallenges: formValues.slideTitle_risksAndChallenges || '',
+      },
       colors: { ...(template?.colors || DEFAULT_TEMPLATE.colors) },
       slides: { ...(template?.slides || DEFAULT_TEMPLATE.slides) },
       slideLayouts: Object.fromEntries(slideInfo.map(s => [s.key, s.masterLayout])),
-      slideImages: { ...slideImages },
       timezone: formValues.timezone,
       workDays: formValues.workDays,
       hoursPerDay: formValues.hoursPerDay,
@@ -261,11 +246,17 @@ export default function ReportTemplateSettings({ project }: ReportTemplateSettin
       logoUrlLeft: DEFAULT_TEMPLATE.logoUrlLeft,
       logoUrlRight: DEFAULT_TEMPLATE.logoUrlRight,
       language: DEFAULT_TEMPLATE.language,
-      showVarianceIndicator: DEFAULT_TEMPLATE.showVarianceIndicator,
-      showProgressBars: DEFAULT_TEMPLATE.showProgressBars,
       milestonesPerPage: DEFAULT_TEMPLATE.milestonesPerPage,
       risksPerPage: DEFAULT_TEMPLATE.risksPerPage,
       timelinePerPage: DEFAULT_TEMPLATE.timelinePerPage,
+      thisWeekPerPage: DEFAULT_TEMPLATE.thisWeekPerPage,
+      nextWeekPerPage: DEFAULT_TEMPLATE.nextWeekPerPage,
+      slideTitle_agenda:             '',
+      slideTitle_executiveSummary:   '',
+      slideTitle_weeklyProgress:     '',
+      slideTitle_nextWeek:           '',
+      slideTitle_milestones:         '',
+      slideTitle_risksAndChallenges: '',
       timezone: '',
       workDays: [],
       hoursPerDay: 8,
@@ -290,26 +281,6 @@ export default function ReportTemplateSettings({ project }: ReportTemplateSettin
     saveMutation.mutate({ slides: newSlides });
   };
 
-  const handleLogoUpload = async (file: File, logoType: 'logoUrlLeft' | 'logoUrlRight') => {
-    try {
-      if (logoType === 'logoUrlLeft') setUploadingLeft(true);
-      else setUploadingRight(true);
-      const result = await api.uploadLogo(project.id, logoType, file);
-      message.success('Logo uploaded successfully!');
-      // Update form value
-      form.setFieldValue(logoType, result.logoPath);
-      queryClient.invalidateQueries({ queryKey: ['report-template', project.id] });
-    } catch (err) {
-      message.error('Logo upload failed');
-    } finally {
-      if (logoType === 'logoUrlLeft') setUploadingLeft(false);
-      else setUploadingRight(false);
-    }
-  };
-
-  const [uploadingLeft, setUploadingLeft] = useState(false);
-  const [uploadingRight, setUploadingRight] = useState(false);
-
   // ---- Header / Footer upload handlers ----
   const handleLayoutImageUpload = async (layoutType: LayoutType, file: File) => {
     try {
@@ -331,34 +302,6 @@ export default function ReportTemplateSettings({ project }: ReportTemplateSettin
     message.success('Image removed');
   };
 
-  // ---- Per-slide background image handlers ----
-  const handleSlideImageUpload = async (slideKey: string, file: File) => {
-    try {
-      setUploadingSlide(prev => ({ ...prev, [slideKey]: true }));
-      const result = await api.uploadSlideImage(project.id, slideKey, file);
-      message.success('Slide image uploaded!');
-      setSlideImages(prev => ({ ...prev, [slideKey]: result.imagePath }));
-      queryClient.invalidateQueries({ queryKey: ['report-template', project.id] });
-    } catch {
-      message.error('Slide image upload failed');
-    } finally {
-      setUploadingSlide(prev => ({ ...prev, [slideKey]: false }));
-    }
-  };
-
-  const handleSlideImageDelete = (slideKey: string) => {
-    const updatedImages = { ...slideImages, [slideKey]: '' };
-    setSlideImages(updatedImages);
-    saveMutation.mutate({ slideImages: updatedImages });
-    message.success('Slide image removed');
-  };
-
-  const handleLogoDelete = (logoType: 'logoUrlLeft' | 'logoUrlRight') => {
-    form.setFieldValue(logoType, '');
-    saveMutation.mutate({ [logoType]: '' });
-    message.success('تم حذف الشعار بنجاح / Logo removed successfully');
-  };
-
   if (isLoading) {
     return (
       <div style={{ textAlign: 'center', padding: 60 }}>
@@ -374,112 +317,13 @@ export default function ReportTemplateSettings({ project }: ReportTemplateSettin
   // ── Tab: General ─────────────────────────────────────────────────────────
   const tabGeneral = (
     <Form form={form} layout="vertical">
-      {/* Company Identity */}
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-          <div style={{ width: 4, height: 20, background: '#951919', borderRadius: 2 }} />
-          <Text strong style={{ fontSize: 14 }}>هوية الشركة / Company Identity</Text>
-        </div>
-        <Row gutter={16}>
-          <Col span={12}>
-            <Form.Item label="Company Name (English)" name="companyName">
-              <Input placeholder="e.g., Your Company" prefix={<SettingOutlined style={{ color: '#bbb' }} />} />
-            </Form.Item>
-          </Col>
-          <Col span={12}>
-            <Form.Item label="اسم الشركة (عربي)" name="companyNameAr">
-              <Input placeholder="مثال: شركتك" dir="rtl" prefix={<SettingOutlined style={{ color: '#bbb' }} />} />
-            </Form.Item>
-          </Col>
-        </Row>
-      </div>
-
-      <Divider style={{ margin: '0 0 20px' }} />
-
-      {/* Logos */}
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-          <div style={{ width: 4, height: 20, background: '#951919', borderRadius: 2 }} />
-          <Text strong style={{ fontSize: 14 }}>الشعارات / Logos</Text>
-        </div>
-        <Row gutter={16}>
-          {(['logoUrlLeft', 'logoUrlRight'] as const).map((logoType) => {
-            const isLeft = logoType === 'logoUrlLeft';
-            const isUploading = isLeft ? uploadingLeft : uploadingRight;
-            const currentUrl = template?.[logoType] || form.getFieldValue(logoType);
-            return (
-              <Col span={12} key={logoType}>
-                <Card
-                  size="small"
-                  style={{ borderRadius: 8, border: '1px solid #e8e8e8', textAlign: 'center' }}
-                  styles={{ body: { padding: 16 } }}
-                >
-                  <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 12 }}>
-                    {isLeft ? '◀ شعار يسار / Left Logo' : 'شعار يمين / Right Logo ▶'}
-                  </Text>
-                  {currentUrl ? (
-                    <div style={{
-                      height: 72, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: '#f8fafc', borderRadius: 6, border: '1px solid #e8e8e8', marginBottom: 10,
-                    }}>
-                      <img
-                        src={`http://localhost:5000${currentUrl}`}
-                        alt={isLeft ? 'Left Logo' : 'Right Logo'}
-                        style={{ maxHeight: 60, maxWidth: '90%', objectFit: 'contain' }}
-                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                      />
-                    </div>
-                  ) : (
-                    <div style={{
-                      height: 72, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: '#fafafa', borderRadius: 6, border: '2px dashed #d9d9d9', marginBottom: 10,
-                      color: '#bbb', fontSize: 12,
-                    }}>
-                      <Space direction="vertical" size={4} style={{ textAlign: 'center' }}>
-                        <FileImageOutlined style={{ fontSize: 20 }} />
-                        <span>لا يوجد شعار</span>
-                      </Space>
-                    </div>
-                  )}
-                  <Space style={{ width: '100%', justifyContent: 'center' }}>
-                    <Upload
-                      accept="image/*"
-                      showUploadList={false}
-                      customRequest={({ file }) => handleLogoUpload(file as File, logoType)}
-                      disabled={isUploading}
-                    >
-                      <Button icon={<FileImageOutlined />} loading={isUploading} size="small" type="primary" ghost>
-                        {currentUrl ? 'تغيير' : 'رفع'}
-                      </Button>
-                    </Upload>
-                    {currentUrl && (
-                      <Button danger icon={<DeleteOutlined />} size="small" onClick={() => handleLogoDelete(logoType)}>
-                        حذف
-                      </Button>
-                    )}
-                  </Space>
-                </Card>
-              </Col>
-            );
-          })}
-        </Row>
-        <Form.Item label="Logo Display / عرض الشعار" name="logoRepeat" initialValue={template?.logoRepeat || 'first'} style={{ marginTop: 12 }}>
-          <Radio.Group onChange={(e) => saveMutation.mutate({ logoRepeat: e.target.value })} buttonStyle="solid">
-            <Radio.Button value="first">الصفحة الأولى فقط</Radio.Button>
-            <Radio.Button value="all">جميع الشرائح</Radio.Button>
-          </Radio.Group>
-        </Form.Item>
-      </div>
-
-      <Divider style={{ margin: '0 0 20px' }} />
-
       {/* Language & Display */}
       <div style={{ marginBottom: 24 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
           <div style={{ width: 4, height: 20, background: '#951919', borderRadius: 2 }} />
-          <Text strong style={{ fontSize: 14 }}>اللغة والعرض / Language & Display</Text>
+          <Text strong style={{ fontSize: 14 }}>Language & Display</Text>
         </div>
-        <Form.Item label="Report Language / لغة التقرير" name="language">
+        <Form.Item label="Report Language" name="language">
           <Radio.Group buttonStyle="solid">
             <Radio.Button value="ar">العربية</Radio.Button>
             <Radio.Button value="en">English</Radio.Button>
@@ -487,31 +331,31 @@ export default function ReportTemplateSettings({ project }: ReportTemplateSettin
           </Radio.Group>
         </Form.Item>
         <Row gutter={16}>
-          <Col span={12}>
-            <Form.Item label="Show Variance Indicator / مؤشر التباين" name="showVarianceIndicator" valuePropName="checked">
-              <Switch checkedChildren="مفعّل" unCheckedChildren="معطّل" />
+          <Col span={8}>
+            <Form.Item label="Milestones per page" name="milestonesPerPage">
+              <InputNumber min={5} max={25} style={{ width: '100%' }} />
             </Form.Item>
           </Col>
-          <Col span={12}>
-            <Form.Item label="Show Progress Bars / أشرطة التقدم" name="showProgressBars" valuePropName="checked">
-              <Switch checkedChildren="مفعّل" unCheckedChildren="معطّل" />
+          <Col span={8}>
+            <Form.Item label="Timeline per page" name="timelinePerPage">
+              <InputNumber min={5} max={25} style={{ width: '100%' }} />
+            </Form.Item>
+          </Col>
+          <Col span={8}>
+            <Form.Item label="Risks per page" name="risksPerPage">
+              <InputNumber min={3} max={20} style={{ width: '100%' }} />
             </Form.Item>
           </Col>
         </Row>
         <Row gutter={16}>
-          <Col span={8}>
-            <Form.Item label="Milestones / صفحة" name="milestonesPerPage">
-              <InputNumber min={5} max={20} style={{ width: '100%' }} />
+          <Col span={12}>
+            <Form.Item label="This Week — per page" name="thisWeekPerPage">
+              <InputNumber min={5} max={30} style={{ width: '100%' }} />
             </Form.Item>
           </Col>
-          <Col span={8}>
-            <Form.Item label="Timeline / صفحة" name="timelinePerPage">
-              <InputNumber min={5} max={20} style={{ width: '100%' }} />
-            </Form.Item>
-          </Col>
-          <Col span={8}>
-            <Form.Item label="Risks / صفحة" name="risksPerPage">
-              <InputNumber min={3} max={15} style={{ width: '100%' }} />
+          <Col span={12}>
+            <Form.Item label="Next Week — per page" name="nextWeekPerPage">
+              <InputNumber min={5} max={30} style={{ width: '100%' }} />
             </Form.Item>
           </Col>
         </Row>
@@ -521,17 +365,18 @@ export default function ReportTemplateSettings({ project }: ReportTemplateSettin
 
   // ── Tab: Colors ───────────────────────────────────────────────────────────
   const allColorFields = [
-    { key: 'primary',   label: 'Primary',   labelAr: 'الأساسي',   desc: 'Header bars, key elements' },
-    { key: 'secondary', label: 'Secondary', labelAr: 'الثانوي',   desc: 'Section slides background' },
-    { key: 'accent',    label: 'Accent',    labelAr: 'التمييز',   desc: 'Divider lines, highlights' },
-    { key: 'success',   label: 'Success',   labelAr: 'النجاح',    desc: 'Completed, on-track' },
-    { key: 'warning',   label: 'Warning',   labelAr: 'التحذير',   desc: 'Medium risk, delayed' },
-    { key: 'danger',    label: 'Danger',    labelAr: 'الخطر',     desc: 'Critical, overdue' },
+    { key: 'primary',     label: 'Primary',      labelAr: 'الأساسي',   desc: 'Header bars, key elements' },
+    { key: 'secondary',   label: 'Secondary',    labelAr: 'الثانوي',   desc: 'Section slides background' },
+    { key: 'accent',      label: 'Accent',       labelAr: 'التمييز',   desc: 'Divider lines, highlights' },
+    { key: 'success',     label: 'Success',      labelAr: 'النجاح',    desc: 'Completed, on-track' },
+    { key: 'warning',     label: 'Warning',      labelAr: 'التحذير',   desc: 'Medium risk, delayed' },
+    { key: 'danger',      label: 'Danger',       labelAr: 'الخطر',     desc: 'Critical, overdue' },
+    { key: 'headerTitle', label: 'Header Title', labelAr: 'عنوان الرأس', desc: 'Slide header title text color' },
   ];
   const tabColors = (
     <div>
       <Alert
-        message="يتم الحفظ تلقائياً عند تغيير اللون / Colors are saved automatically on change"
+        message="Colors are saved automatically on change"
         type="info" showIcon style={{ marginBottom: 20, borderRadius: 8 }}
       />
       <Row gutter={[16, 16]}>
@@ -582,10 +427,13 @@ export default function ReportTemplateSettings({ project }: ReportTemplateSettin
   );
 
   // ── Tab: Slides ───────────────────────────────────────────────────────────
+  // Slides that have a customizable header title (titlePage has no header bar)
+  const SLIDE_TITLE_KEYS = new Set(['agenda','executiveSummary','weeklyProgress','nextWeek','milestones','risksAndChallenges']);
+
   const tabSlides = (
-    <div>
+    <Form form={form} layout="vertical">
       <Alert
-        message={`${enabledCount} من ${slideInfo.length} شريحة مفعّلة / ${enabledCount} of ${slideInfo.length} slides enabled`}
+        message={`${enabledCount} of ${slideInfo.length} slides enabled`}
         type={enabledCount > 0 ? 'success' : 'warning'}
         showIcon style={{ marginBottom: 16, borderRadius: 8 }}
       />
@@ -631,6 +479,25 @@ export default function ReportTemplateSettings({ project }: ReportTemplateSettin
                         onChange={v => setSlideInfo(prev => prev.map(s => s.key === slide.key ? { ...s, masterLayout: v } : s))}
                         disabled={!isEnabled}
                       />
+                      {SLIDE_TITLE_KEYS.has(slide.key) && (
+                        <Form.Item
+                          name={`slideTitle_${slide.key}`}
+                          style={{ marginTop: 8, marginBottom: 0 }}
+                          label={
+                            <span style={{ fontSize: 11, color: '#888', display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <EditOutlined style={{ fontSize: 11 }} /> Slide header title
+                            </span>
+                          }
+                        >
+                          <Input
+                            size="small"
+                            placeholder={`e.g. ${slide.label}`}
+                            style={{ width: '100%', maxWidth: 400 }}
+                            disabled={!isEnabled}
+                            allowClear
+                          />
+                        </Form.Item>
+                      )}
                     </div>
                   </Space>
                 </Col>
@@ -647,39 +514,7 @@ export default function ReportTemplateSettings({ project }: ReportTemplateSettin
           );
         })}
       </div>
-
-      {/* Live preview */}
-      <Divider style={{ margin: '0 0 12px' }}>
-        <Text type="secondary" style={{ fontSize: 12 }}>ترتيب الشرائح المفعّلة / Slide Order Preview</Text>
-      </Divider>
-      <DndContext
-        collisionDetection={closestCenter}
-        onDragEnd={({ active, over }) => {
-          if (active.id !== over?.id) {
-            const oldIndex = slideInfo.findIndex(s => s.key === active.id);
-            const newIndex = slideInfo.findIndex(s => s.key === over?.id);
-            setSlideInfo(arrayMove(slideInfo, oldIndex, newIndex));
-          }
-        }}
-      >
-        <SortableContext
-          items={slideInfo.filter(s => currentSlides[s.key as keyof typeof currentSlides] ?? true).map(s => s.key)}
-          strategy={verticalListSortingStrategy}
-        >
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, minHeight: 80 }}>
-            {slideInfo.filter(s => currentSlides[s.key as keyof typeof currentSlides] ?? true).map((slide, idx) => (
-              <SortableSlide
-                key={slide.key}
-                id={slide.key}
-                idx={idx}
-                labelAr={slide.labelAr}
-                primaryColor={currentColors.primary}
-              />
-            ))}
-          </div>
-        </SortableContext>
-      </DndContext>
-    </div>
+    </Form>
   );
 
   // ── Tab: Backgrounds ─────────────────────────────────────────────────────
@@ -689,10 +524,10 @@ export default function ReportTemplateSettings({ project }: ReportTemplateSettin
       <div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
           <div style={{ width: 4, height: 20, background: '#951919', borderRadius: 2 }} />
-          <Text strong style={{ fontSize: 14 }}>خلفيات التخطيطات الرئيسية / Master Layout Backgrounds</Text>
+          <Text strong style={{ fontSize: 14 }}>Master Layout Backgrounds</Text>
         </div>
         <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 12 }}>
-          تطبّق على كل الشرائح التي تستخدم نفس التخطيط. المقاس الموصى به: <strong>1333 × 750 px</strong>
+          Applies to all slides using the same layout. Recommended size: <strong>1333 × 750 px</strong>
         </Text>
         <Row gutter={[12, 12]}>
           {MASTER_LAYOUT_OPTIONS.map(({ value, label }) => {
@@ -733,12 +568,12 @@ export default function ReportTemplateSettings({ project }: ReportTemplateSettin
                       disabled={uploadingLayout[lt]}
                     >
                       <Button icon={<PictureOutlined />} loading={uploadingLayout[lt]} size="small" type="primary" ghost style={{ width: '100%' }}>
-                        {imgUrl ? 'تغيير' : 'رفع'}
+                        {imgUrl ? 'Change' : 'Upload'}
                       </Button>
                     </Upload>
                     {imgUrl && (
                       <Button danger icon={<DeleteOutlined />} size="small" style={{ width: '100%' }} onClick={() => handleLayoutImageDelete(lt)}>
-                        حذف
+                        Delete
                       </Button>
                     )}
                   </Space>
@@ -773,7 +608,7 @@ export default function ReportTemplateSettings({ project }: ReportTemplateSettin
           </div>
           <div>
             <Text style={{ color: '#fff', fontSize: 16, fontWeight: 700, display: 'block' }}>
-              إعدادات قالب التقرير
+              Report Template Settings
             </Text>
             <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12 }}>
               Report Template Settings — {project.name}
@@ -787,15 +622,23 @@ export default function ReportTemplateSettings({ project }: ReportTemplateSettin
             loading={isExporting}
             style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff' }}
           >
-            معاينة
-          </Button>
-          <Button
-            icon={<UndoOutlined />}
-            onClick={handleReset}
-            style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.3)', color: '#fff' }}
+          Preview
+            </Button>
+          <Popconfirm
+            title="Reset to defaults?"
+            description="This will discard all custom settings and restore defaults."
+            onConfirm={handleReset}
+            okText="Yes, reset"
+            cancelText="Cancel"
+            okButtonProps={{ danger: true }}
           >
-            إعادة تعيين
-          </Button>
+            <Button
+              icon={<UndoOutlined />}
+              style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.3)', color: '#fff' }}
+            >
+              Reset Settings
+            </Button>
+          </Popconfirm>
           <Button
             type="primary"
             icon={<SaveOutlined />}
@@ -803,7 +646,7 @@ export default function ReportTemplateSettings({ project }: ReportTemplateSettin
             loading={saveMutation.isPending}
             style={{ background: '#951919', border: 'none', fontWeight: 600 }}
           >
-            حفظ الإعدادات
+            Save Settings
           </Button>
         </Space>
       </div>
@@ -819,7 +662,7 @@ export default function ReportTemplateSettings({ project }: ReportTemplateSettin
               label: (
                 <Space>
                   <SettingOutlined />
-                  <span>الإعدادات العامة</span>
+                  <span>General Settings</span>
                 </Space>
               ),
               children: <div style={{ paddingTop: 16 }}>{tabGeneral}</div>,
@@ -829,7 +672,7 @@ export default function ReportTemplateSettings({ project }: ReportTemplateSettin
               label: (
                 <Space>
                   <AppstoreOutlined />
-                  <span>الشرائح</span>
+                  <span>Slides</span>
                   <Badge count={enabledCount} style={{ background: '#951919' }} />
                 </Space>
               ),
@@ -840,7 +683,7 @@ export default function ReportTemplateSettings({ project }: ReportTemplateSettin
               label: (
                 <Space>
                   <BgColorsOutlined />
-                  <span>الألوان</span>
+                  <span>Colors</span>
                 </Space>
               ),
               children: <div style={{ paddingTop: 16 }}>{tabColors}</div>,
@@ -850,7 +693,7 @@ export default function ReportTemplateSettings({ project }: ReportTemplateSettin
               label: (
                 <Space>
                   <PictureOutlined />
-                  <span>الخلفيات</span>
+                  <span>Master Layout</span>
                 </Space>
               ),
               children: <div style={{ paddingTop: 16 }}>{tabBackgrounds}</div>,
@@ -862,35 +705,4 @@ export default function ReportTemplateSettings({ project }: ReportTemplateSettin
   );
 }
 
-// Sortable slide component for drag-and-drop
-function SortableSlide({ id, idx, labelAr, primaryColor }: { id: string; idx: number; labelAr: string; primaryColor: string }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
-  const style = {
-    width: 120,
-    height: 70,
-    backgroundColor: idx === 0 ? `#${primaryColor}` : '#f5f5f5',
-    border: isDragging ? '2px dashed #1890ff' : '1px solid #d9d9d9',
-    borderRadius: 4,
-    display: 'flex',
-    flexDirection: 'column' as const,
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: 9,
-    color: idx === 0 ? '#fff' : '#333',
-    padding: 4,
-    textAlign: 'center' as const,
-    cursor: 'grab',
-    opacity: isDragging ? 0.7 : 1,
-    transform: CSS.Transform.toString(transform),
-    transition,
-    boxShadow: isDragging ? '0 2px 8px #1890ff33' : undefined,
-  };
-  return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      <div style={{ fontWeight: 'bold', marginBottom: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
-        <DragOutlined /> Slide {idx + 1}
-      </div>
-      <div>{labelAr}</div>
-    </div>
-  );
-}
+// Sortable slide component removed (Slide Order Preview section removed)
