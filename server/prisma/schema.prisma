@@ -94,12 +94,13 @@ model Project {
   updatedAt   DateTime @updatedAt
   
   // Relations
-  members     ProjectMember[]
-  tasks       Task[]
-  worklogs    Worklog[]
-  raidItems   RAIDItem[]
-  reports     Report[]
-  products    ProjectProduct[]  // Products sold in this project
+  members          ProjectMember[]
+  tasks            Task[]
+  worklogs         Worklog[]
+  raidItems        RAIDItem[]
+  reports          Report[]
+  products         ProjectProduct[]  // Products sold in this project
+  weeklyHighlights WeeklyHighlight[]
   
   @@map("projects")
 }
@@ -579,5 +580,31 @@ model SystemSetting {
   
   @@unique([category, key])
   @@map("system_settings")
+}
+
+// ============================================
+// WEEKLY HIGHLIGHTS (for combined weekly report slide)
+// ============================================
+
+model WeeklyHighlight {
+  id          String               @id @default(uuid())
+  
+  projectId   String
+  project     Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  weekDate    DateTime             // Monday of the report week
+  type        WeeklyHighlightType
+  description String
+  sortOrder   Int                  @default(0)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("weekly_highlights")
+}
+
+enum WeeklyHighlightType {
+  COMPLETED
+  PLANNED
 }
 

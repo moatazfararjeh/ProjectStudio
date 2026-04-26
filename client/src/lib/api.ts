@@ -422,6 +422,33 @@ class ApiClient {
     });
     return data;
   }
+
+  // Weekly Highlights
+  async getWeeklyHighlights(projectId: string, weekDate?: string) {
+    const params = weekDate ? `?weekDate=${weekDate}` : '';
+    const { data } = await this.client.get<any[]>(`/projects/${projectId}/weekly-highlights${params}`);
+    return data;
+  }
+
+  async getWeeklyHighlightWeeks(projectId: string) {
+    const { data } = await this.client.get<string[]>(`/projects/${projectId}/weekly-highlights/weeks`);
+    return data;
+  }
+
+  async createWeeklyHighlight(projectId: string, payload: { weekDate: string; type: 'COMPLETED' | 'PLANNED'; description: string; sortOrder?: number }) {
+    const { data } = await this.client.post(`/projects/${projectId}/weekly-highlights`, payload);
+    return data;
+  }
+
+  async updateWeeklyHighlight(projectId: string, hid: string, payload: Partial<{ weekDate: string; type: 'COMPLETED' | 'PLANNED'; description: string; sortOrder: number }>) {
+    const { data } = await this.client.put(`/projects/${projectId}/weekly-highlights/${hid}`, payload);
+    return data;
+  }
+
+  async deleteWeeklyHighlight(projectId: string, hid: string) {
+    const { data } = await this.client.delete(`/projects/${projectId}/weekly-highlights/${hid}`);
+    return data;
+  }
 }
 
 export const api = new ApiClient();

@@ -11,6 +11,13 @@ import {
   updateMember,
   getMyProjects,
 } from '../controllers/project.controller';
+import {
+  getWeeklyHighlights,
+  getWeeklyHighlightWeeks,
+  createWeeklyHighlight,
+  updateWeeklyHighlight,
+  deleteWeeklyHighlight,
+} from '../controllers/weeklyHighlight.controller';
 
 const router = Router();
 
@@ -27,5 +34,12 @@ router.delete('/:id', deleteProject);
 router.post('/:id/members', addMember);
 router.put('/:id/members/:memberId', updateMember);
 router.delete('/:id/members/:memberId', removeMember);
+
+// Weekly Highlights
+router.get('/:id/weekly-highlights/weeks', getWeeklyHighlightWeeks);
+router.get('/:id/weekly-highlights', getWeeklyHighlights);
+router.post('/:id/weekly-highlights', createWeeklyHighlight);
+router.put('/:id/weekly-highlights/:hid', updateWeeklyHighlight);
+router.delete('/:id/weekly-highlights/:hid', deleteWeeklyHighlight);
 
 export default router;

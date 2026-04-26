@@ -69,6 +69,7 @@ const DEFAULT_TEMPLATE = {
     titlePage: true,
     agenda: true,
     executiveSummary: true,
+    weeklyHighlights: true,
     weeklyProgress: true,
     nextWeek: true,
     milestones: true,
@@ -83,6 +84,7 @@ const DEFAULT_TEMPLATE = {
   slideTitles: {
     agenda:             '',
     executiveSummary:   '',
+    weeklyHighlights:   '',
     weeklyProgress:     '',
     nextWeek:           '',
     milestones:         '',
@@ -109,6 +111,7 @@ export default function ReportTemplateSettings({ project }: ReportTemplateSettin
     { key: 'titlePage',          label: 'Title Page',        labelAr: '',      desc: 'Project name & report date',      masterLayout: 'cover' },
     { key: 'agenda',             label: 'Agenda',            labelAr: '',      desc: 'Meeting agenda items',            masterLayout: 'sectionTitle' },
     { key: 'executiveSummary',   label: 'Dashboard',         labelAr: '',      desc: 'Progress cards & statistics',     masterLayout: 'titleAndContent' },
+    { key: 'weeklyHighlights',   label: 'Weekly Highlights', labelAr: '',      desc: 'Completed + Planned two-column slide', masterLayout: 'titleAndContent' },
     { key: 'weeklyProgress',     label: 'This Week',         labelAr: '',      desc: 'Completed tasks this week',       masterLayout: 'titleAndContent' },
     { key: 'nextWeek',           label: 'Next Week',         labelAr: '',      desc: 'Planned tasks next week',        masterLayout: 'titleAndContent' },
     { key: 'milestones',         label: 'Key Milestones',    labelAr: '',      desc: 'Milestones table with variance',  masterLayout: 'contentEmpty' },
@@ -147,6 +150,7 @@ export default function ReportTemplateSettings({ project }: ReportTemplateSettin
         nextWeekPerPage: (template as any).nextWeekPerPage || 18,
         slideTitle_agenda:             (template as any).slideTitles?.agenda             || '',
         slideTitle_executiveSummary:   (template as any).slideTitles?.executiveSummary   || '',
+        slideTitle_weeklyHighlights:   (template as any).slideTitles?.weeklyHighlights   || '',
         slideTitle_weeklyProgress:     (template as any).slideTitles?.weeklyProgress     || '',
         slideTitle_nextWeek:           (template as any).slideTitles?.nextWeek           || '',
         slideTitle_milestones:         (template as any).slideTitles?.milestones         || '',
@@ -222,6 +226,7 @@ export default function ReportTemplateSettings({ project }: ReportTemplateSettin
       slideTitles: {
         agenda:             formValues.slideTitle_agenda             || '',
         executiveSummary:   formValues.slideTitle_executiveSummary   || '',
+        weeklyHighlights:   formValues.slideTitle_weeklyHighlights   || '',
         weeklyProgress:     formValues.slideTitle_weeklyProgress     || '',
         nextWeek:           formValues.slideTitle_nextWeek           || '',
         milestones:         formValues.slideTitle_milestones         || '',
@@ -253,6 +258,7 @@ export default function ReportTemplateSettings({ project }: ReportTemplateSettin
       nextWeekPerPage: DEFAULT_TEMPLATE.nextWeekPerPage,
       slideTitle_agenda:             '',
       slideTitle_executiveSummary:   '',
+      slideTitle_weeklyHighlights:   '',
       slideTitle_weeklyProgress:     '',
       slideTitle_nextWeek:           '',
       slideTitle_milestones:         '',
@@ -428,7 +434,7 @@ export default function ReportTemplateSettings({ project }: ReportTemplateSettin
 
   // ── Tab: Slides ───────────────────────────────────────────────────────────
   // Slides that have a customizable header title (titlePage has no header bar)
-  const SLIDE_TITLE_KEYS = new Set(['agenda','executiveSummary','weeklyProgress','nextWeek','milestones','risksAndChallenges']);
+  const SLIDE_TITLE_KEYS = new Set(['agenda','executiveSummary','weeklyHighlights','weeklyProgress','nextWeek','milestones','risksAndChallenges']);
 
   const tabSlides = (
     <Form form={form} layout="vertical">

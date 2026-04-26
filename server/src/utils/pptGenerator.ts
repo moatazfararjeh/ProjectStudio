@@ -607,6 +607,157 @@ export async function generateWeeklyReportPPT(projectId: string): Promise<Buffer
   } // end executiveSummary
 
   // ============================================================
+  //  SLIDE 3b: WEEKLY HIGHLIGHTS (completed + planned — two columns)
+  //  Data from WeeklyHighlight table, matched to this report's week
+  // ============================================================
+  if ((cfg.slides as any).weeklyHighlights) {
+    const weekHighlights = await prisma.weeklyHighlight.findMany({
+      where: {
+        projectId,
+        weekDate: { gte: monday, lte: sunday },
+      },
+      orderBy: [{ type: 'asc' }, { sortOrder: 'asc' }],
+    });
+
+    const completedHL = weekHighlights.filter(h => h.type === 'COMPLETED');
+    const plannedHL   = weekHighlights.filter(h => h.type === 'PLANNED');
+
+    const slideHL = createSlide(masterForSlide('weeklyHighlights'));
+    addSlideBg(slideHL, 'weeklyHighlights');
+    addSlideHeader(slideHL, (cfg as any).slideTitles?.weeklyHighlights || t('ملخص الأسبوع', 'Weekly Highlights', 'ملخص الأسبوع - Weekly Highlights'));
+
+    // Layout: two columns + right-side progress doughnut area (matching screenshot)
+    const LEFT_X   = IS_RTL ? 6.8 : 0.2;   // "this week" column
+    const RIGHT_X  = IS_RTL ? 0.2 : 6.8;   // "next week" column
+    const COL_W    = 6.3;
+    const COL_Y    = 1.0;
+    const COL_H    = 5.6;
+    const CHART_X  = IS_RTL ? 0.2 : 10.1;  // donut charts area (slim right strip when LTR, left when RTL — override below)
+    const CHART_COL_X = IS_RTL ? 0.2 : 10.1;
+    const CHART_COL_W = 2.8;
+
+    // --- Column headers ---
+    const completedTitle = t('ما تم إنجازه في الفترة السابقة (أسبوعي)', 'Completed This Week', 'ما تم إنجازه في الفترة السابقة (أسبوعي)');
+    const plannedTitle   = t('المهام المخطط إنجازها في الفترة القادمة (أسبوعي)', 'Planned Next Week', 'المهام المخطط إنجازها في الفترة القادمة (أسبوعي)');
+
+    // Column header background
+    slideHL.addShape('rect' as any, {
+      x: LEFT_X, y: COL_Y, w: COL_W, h: 0.4,
+      fill: { color: THEME.secondary },
+    });
+    slideHL.addText(completedTitle, {
+      x: LEFT_X, y: COL_Y, w: COL_W, h: 0.4,
+      fontSize: 11, bold: true, color: THEME.white,
+      align: IS_RTL ? 'center' : 'center', valign: 'middle', rtlMode: IS_RTL,
+    });
+
+    slideHL.addShape('rect' as any, {
+      x: RIGHT_X, y: COL_Y, w: COL_W, h: 0.4,
+      fill: { color: THEME.primary },
+    });
+    slideHL.addText(plannedTitle, {
+      x: RIGHT_X, y: COL_Y, w: COL_W, h: 0.4,
+      fontSize: 11, bold: true, color: THEME.white,
+      align: 'center', valign: 'middle', rtlMode: IS_RTL,
+    });
+
+    // --- Bullet items ---
+    const ITEM_Y_START = COL_Y + 0.48;
+    const ITEM_H       = 0.42;
+    const BULLET       = IS_RTL ? '•' : '•';
+
+    const renderItems = (items: { description: string }[], colX: number, colW: number) => {
+      if (items.length === 0) {
+        slideHL.addText(t('لا توجد بيانات', 'No data', 'لا توجد بيانات / No data'), {
+          x: colX + 0.1, y: ITEM_Y_START, w: colW - 0.2, h: 0.4,
+          fontSize: 10, italic: true, color: THEME.lightText,
+          align: IS_RTL ? 'right' : 'left', rtlMode: IS_RTL,
+        });
+        return;
+      }
+      items.forEach((item, idx) => {
+        const y = ITEM_Y_START + idx * ITEM_H;
+        if (y + ITEM_H > COL_Y + COL_H) return; // overflow guard
+        const rowFill = idx % 2 !== 0 ? 'F8FAFC' : 'FFFFFF';
+        slideHL.addShape('rect' as any, {
+          x: colX, y, w: colW, h: ITEM_H - 0.04,
+          fill: { color: rowFill },
+        });
+        slideHL.addText(`${BULLET}  ${item.description}`, {
+          x: colX + 0.15, y, w: colW - 0.2, h: ITEM_H - 0.04,
+          fontSize: 10, color: THEME.text,
+          align: IS_RTL ? 'right' : 'left', valign: 'middle', rtlMode: IS_RTL, wrap: true,
+        });
+      });
+    };
+
+    renderItems(completedHL, LEFT_X, COL_W);
+    renderItems(plannedHL, RIGHT_X, COL_W);
+
+    // --- Right-side progress metrics (doughnut-style stat cards) ---
+    const statCardX = CHART_COL_X;
+    const statCardW = CHART_COL_W;
+
+    // Actual progress card
+    slideHL.addShape('roundRect' as any, {
+      x: statCardX, y: 1.0, w: statCardW, h: 2.0,
+      fill: { color: THEME.cardBg },
+      shadow: { type: 'outer', blur: 5, offset: 2, color: '00000018' },
+      rectRadius: 0.1,
+    });
+    slideHL.addText(`${actualProgress.toFixed(1)}%`, {
+      x: statCardX, y: 1.1, w: statCardW, h: 0.9,
+      fontSize: 32, bold: true, color: THEME.success, align: 'center',
+    });
+    slideHL.addText(t('نسبة الإنجاز\nالفعلية', 'Actual\nProgress', 'نسبة الإنجاز\nالفعلية'), {
+      x: statCardX, y: 2.0, w: statCardW, h: 0.9,
+      fontSize: 10, color: THEME.text, align: 'center', rtlMode: IS_RTL,
+    });
+
+    // Planned progress card
+    slideHL.addShape('roundRect' as any, {
+      x: statCardX, y: 3.15, w: statCardW, h: 2.0,
+      fill: { color: THEME.cardBg },
+      shadow: { type: 'outer', blur: 5, offset: 2, color: '00000018' },
+      rectRadius: 0.1,
+    });
+    slideHL.addText(`${plannedProgress.toFixed(1)}%`, {
+      x: statCardX, y: 3.25, w: statCardW, h: 0.9,
+      fontSize: 32, bold: true, color: THEME.info, align: 'center',
+    });
+    slideHL.addText(t('نسبة الإنجاز\nالمخططة', 'Planned\nProgress', 'نسبة الإنجاز\nالمخططة'), {
+      x: statCardX, y: 4.15, w: statCardW, h: 0.9,
+      fontSize: 10, color: THEME.text, align: 'center', rtlMode: IS_RTL,
+    });
+
+    // Variance badge
+    const varVal = Math.abs(plannedProgress - actualProgress).toFixed(1);
+    const varColor = plannedProgress > actualProgress + 5 ? THEME.danger : plannedProgress > actualProgress ? THEME.warning : THEME.success;
+    slideHL.addShape('roundRect' as any, {
+      x: statCardX, y: 5.3, w: statCardW, h: 0.8,
+      fill: { color: varColor }, rectRadius: 0.08,
+    });
+    slideHL.addText(`${t('مؤشر التباين', 'Variance', 'مؤشر التباين')}\n${varVal}%`, {
+      x: statCardX, y: 5.3, w: statCardW, h: 0.8,
+      fontSize: 11, bold: true, color: THEME.white, align: 'center', valign: 'middle',
+    });
+
+    // Legend at bottom
+    const legendY = 6.6;
+    const legendItems = [
+      { label: t('على المسار', 'On Track', 'On Track'), color: THEME.success },
+      { label: t('مخاطر محتملة', 'At Risk', 'At Risk'), color: THEME.warning },
+      { label: t('متأخر', 'Delayed', 'Delayed'), color: THEME.danger },
+    ];
+    legendItems.forEach((item, i) => {
+      const lx = 1.0 + i * 3.8;
+      slideHL.addShape('rect' as any, { x: lx, y: legendY, w: 0.25, h: 0.18, fill: { color: item.color } });
+      slideHL.addText(item.label, { x: lx + 0.3, y: legendY, w: 3.0, h: 0.18, fontSize: 9, color: THEME.text });
+    });
+
+  } // end weeklyHighlights
+
+  // ============================================================
   //  MILESTONES after Executive Summary (Section 01)
   // ============================================================
   if (cfg.slides.milestones) {

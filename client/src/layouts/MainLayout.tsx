@@ -24,6 +24,7 @@ import {
   RocketOutlined,
   CalendarOutlined,
   FilePptOutlined,
+  CheckCircleOutlined,
 } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -84,6 +85,7 @@ export default function MainLayout() {
         { key: 'raid', icon: <WarningOutlined />, label: 'RAID Log' },
         { key: 'this-week', icon: <RocketOutlined />, label: 'This Week' },
         { key: 'next-week', icon: <CalendarOutlined />, label: 'Next Week' },
+        { key: 'weekly-highlights', icon: <CheckCircleOutlined />, label: 'Weekly Highlights' },
       ],
     },
     {
