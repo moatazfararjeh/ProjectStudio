@@ -61,75 +61,160 @@ const taskSchema = z.object({
 });
 
 /**
- * Calculate and update parent task progress based on its subtasks
- * Recursively updates all ancestor tasks up the hierarchy
+ * Calculate and update parent task progress based on its subtasks.
+ * Uses MS Project's flat leaf-level duration-weighted rollup:
+ *   % Complete = Sum(leaf.progress × leaf.duration) / Sum(leaf.duration)
+ * Loads all project tasks once, then walks up the ancestor chain.
  */
 async function updateParentProgress(taskId: string): Promise<void> {
+  // Need projectId to load all project tasks at once
   const task = await prisma.task.findUnique({
     where: { id: taskId },
-    select: { parentId: true },
+    select: { parentId: true, projectId: true },
   });
 
-  if (!task || !task.parentId) {
-    return; // No parent to update
+  if (!task || !task.parentId) return;
+
+  // Load all tasks in the project once for in-memory computation
+  const allTasks = await prisma.task.findMany({
+    where: { projectId: task.projectId },
+    select: { id: true, parentId: true, progress: true, duration: true, status: true },
+  });
+
+  const taskMap = new Map(allTasks.map(t => [t.id, t]));
+
+  // Build a map: parentId → direct children
+  const childrenMap = new Map<string, typeof allTasks>();
+  for (const t of allTasks) {
+    if (t.parentId) {
+      if (!childrenMap.has(t.parentId)) childrenMap.set(t.parentId, []);
+      childrenMap.get(t.parentId)!.push(t);
+    }
   }
 
-  // Get all subtasks of the parent
-  const subtasks = await prisma.task.findMany({
-    where: { parentId: task.parentId },
-    select: { id: true, name: true, progress: true, status: true },
-  });
-
-  if (subtasks.length === 0) {
-    return;
+  /**
+   * Recursively collect all LEAF descendants of a task.
+   * A leaf is any task that has no children.
+   */
+  function collectLeaves(parentId: string): Array<{ progress: number; duration: number; status: string }> {
+    const children = childrenMap.get(parentId) || [];
+    const leaves: Array<{ progress: number; duration: number; status: string }> = [];
+    for (const child of children) {
+      if (!childrenMap.has(child.id)) {
+        // child has no children → it is a leaf
+        leaves.push({ progress: child.progress || 0, duration: child.duration || 0, status: child.status });
+      } else {
+        leaves.push(...collectLeaves(child.id));
+      }
+    }
+    return leaves;
   }
 
-  // Calculate average progress
-  const totalProgress = subtasks.reduce((sum, subtask) => sum + (subtask.progress || 0), 0);
-  const averageProgress = Math.round(totalProgress / subtasks.length);
+  // Walk every ancestor from immediate parent up to root, updating each one
+  let currentParentId: string | null | undefined = task.parentId;
+  while (currentParentId) {
+    const leaves = collectLeaves(currentParentId);
+    if (leaves.length === 0) {
+      currentParentId = taskMap.get(currentParentId)?.parentId ?? null;
+      continue;
+    }
 
-  // Check if all subtasks are completed
-  const allCompleted = subtasks.every(subtask => 
-    subtask.progress === 100 || subtask.status === 'COMPLETED'
-  );
+    // Duration-weighted average (0-duration milestones contribute 0 weight → excluded)
+    const totalWeight = leaves.reduce((s, l) => s + l.duration, 0);
+    const weightedSum = leaves.reduce((s, l) => s + l.progress * l.duration, 0);
+    // Fall back to simple average if all leaves are milestones (duration = 0)
+    const newProgress = totalWeight > 0
+      ? Math.round(weightedSum / totalWeight)
+      : Math.round(leaves.reduce((s, l) => s + l.progress, 0) / leaves.length);
 
-  // Check if all subtasks are not started
-  const allNotStarted = subtasks.every(subtask => 
-    subtask.progress === 0 || subtask.status === 'NOT_STARTED'
-  );
+    const allCompleted  = leaves.every(l => l.progress === 100 || l.status === 'COMPLETED');
+    const allNotStarted = leaves.every(l => l.progress === 0  && l.status !== 'IN_PROGRESS' && l.status !== 'COMPLETED');
 
-  // Determine status based on progress and subtask states
-  let newStatus: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED';
-  if (allCompleted || averageProgress === 100) {
-    newStatus = 'COMPLETED';
-  } else if (allNotStarted || averageProgress === 0) {
-    newStatus = 'NOT_STARTED';
-  } else {
-    newStatus = 'IN_PROGRESS';
+    const newStatus: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED' =
+      allCompleted  || newProgress === 100 ? 'COMPLETED'  :
+      allNotStarted || newProgress === 0   ? 'NOT_STARTED': 'IN_PROGRESS';
+
+    await prisma.task.update({
+      where: { id: currentParentId },
+      data: { progress: newProgress, status: newStatus },
+    });
+
+    currentParentId = taskMap.get(currentParentId)?.parentId ?? null;
   }
-
-  console.log(`\n[updateParentProgress] Parent Task ID: ${task.parentId}`);
-  console.log(`  Total Subtasks: ${subtasks.length}`);
-  console.log(`  Average Progress: ${averageProgress}%`);
-  console.log(`  All Completed: ${allCompleted}`);
-  console.log(`  New Status: ${newStatus}`);
-  console.log(`  Subtask Details:`);
-  subtasks.forEach((st, idx) => {
-    console.log(`    ${idx + 1}. "${st.name}" - ${st.progress}% ${st.status}`);
-  });
-
-  // Update parent task
-  await prisma.task.update({
-    where: { id: task.parentId },
-    data: {
-      progress: averageProgress,
-      status: newStatus,
-    },
-  });
-
-  // Recursively update grandparent and ancestors
-  await updateParentProgress(task.parentId);
 }
+
+/**
+ * Recalculate ALL parent task progress for a project using the flat leaf-level
+ * duration-weighted rollup (matches MS Project).
+ * Loads all project tasks once, then updates every parent in a single pass.
+ */
+async function recalculateAllParentProgress(projectId: string): Promise<void> {
+  const allTasks = await prisma.task.findMany({
+    where: { projectId },
+    select: { id: true, parentId: true, duration: true, progress: true, status: true },
+  });
+
+  // Build a map: parentId → direct children
+  const childrenMap = new Map<string, typeof allTasks>();
+  for (const t of allTasks) {
+    if (t.parentId) {
+      if (!childrenMap.has(t.parentId)) childrenMap.set(t.parentId, []);
+      childrenMap.get(t.parentId)!.push(t);
+    }
+  }
+
+  function collectLeaves(parentId: string): Array<{ progress: number; duration: number; status: string }> {
+    const children = childrenMap.get(parentId) || [];
+    const leaves: Array<{ progress: number; duration: number; status: string }> = [];
+    for (const child of children) {
+      if (!childrenMap.has(child.id)) {
+        leaves.push({ progress: child.progress || 0, duration: child.duration || 0, status: child.status });
+      } else {
+        leaves.push(...collectLeaves(child.id));
+      }
+    }
+    return leaves;
+  }
+
+  // Every key in childrenMap is a parent — process all of them
+  const parentIds = [...childrenMap.keys()];
+
+  for (const parentId of parentIds) {
+    const leaves = collectLeaves(parentId);
+    if (leaves.length === 0) continue;
+
+    const totalWeight = leaves.reduce((s, l) => s + l.duration, 0);
+    const weightedSum = leaves.reduce((s, l) => s + l.progress * l.duration, 0);
+    const newProgress = totalWeight > 0
+      ? Math.round(weightedSum / totalWeight)
+      : Math.round(leaves.reduce((s, l) => s + l.progress, 0) / leaves.length);
+
+    const allCompleted  = leaves.every(l => l.progress === 100 || l.status === 'COMPLETED');
+    const allNotStarted = leaves.every(l => l.progress === 0  && l.status !== 'IN_PROGRESS' && l.status !== 'COMPLETED');
+
+    const newStatus: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED' =
+      allCompleted  || newProgress === 100 ? 'COMPLETED'  :
+      allNotStarted || newProgress === 0   ? 'NOT_STARTED': 'IN_PROGRESS';
+
+    await prisma.task.update({
+      where: { id: parentId },
+      data: { progress: newProgress, status: newStatus },
+    });
+  }
+}
+
+export const recalculateProgress = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { projectId } = req.body as { projectId: string };
+    if (!projectId) throw new AppError('projectId is required', 400);
+
+    await recalculateAllParentProgress(projectId);
+
+    res.json({ status: 'success', message: 'Progress recalculated successfully' });
+  } catch (err) {
+    next(err);
+  }
+};
 
 export const getTasks = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -679,37 +764,9 @@ export const importMPP = async (req: AuthRequest, res: Response, next: NextFunct
       }
     }
 
-    // Third pass: Recalculate parent task progress based on subtasks
-    // Get all tasks with children (parents)
+    // Third pass: Recalculate parent task progress based on subtasks (duration-weighted)
     console.log('\n=== MPP IMPORT: Recalculating Parent Progress ===');
-    const allImportedTasks = Array.from(taskUidToIdMap.values());
-    const tasksWithParents = new Set<string>();
-    
-    for (const taskId of allImportedTasks) {
-      const task = await prisma.task.findUnique({
-        where: { id: taskId },
-        select: { parentId: true },
-      });
-      if (task?.parentId) {
-        tasksWithParents.add(task.parentId);
-      }
-    }
-
-    console.log(`Found ${tasksWithParents.size} parent tasks to recalculate`);
-    
-    // Recalculate each parent (this will cascade up the hierarchy)
-    for (const parentId of tasksWithParents) {
-      // Get any child of this parent to trigger the update
-      const child = await prisma.task.findFirst({
-        where: { parentId },
-        select: { id: true },
-      });
-      
-      if (child) {
-        await updateParentProgress(child.id);
-      }
-    }
-    
+    await recalculateAllParentProgress(projectId as string);
     console.log('Parent progress recalculation complete\n');
 
     // Update project dates if needed

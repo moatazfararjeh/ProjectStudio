@@ -196,6 +196,11 @@ class ApiClient {
     return data.data!;
   }
 
+  async recalculateProgress(projectId: string) {
+    const { data } = await this.client.post<ApiResponse<any>>('/tasks/recalculate-progress', { projectId });
+    return data.data!;
+  }
+
   // Worklogs
   async getWorklogs(params?: {
     projectId?: string;

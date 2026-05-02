@@ -35,7 +35,7 @@ export const getProjects = async (req: AuthRequest, res: Response, next: NextFun
           select: { id: true, name: true, code: true },
         },
         tasks: {
-          select: { status: true },
+          select: { id: true, parentId: true, progress: true, duration: true, status: true },
         },
         _count: {
           select: { members: true, tasks: true },
@@ -44,11 +44,20 @@ export const getProjects = async (req: AuthRequest, res: Response, next: NextFun
       orderBy: { createdAt: 'desc' },
     });
 
-    // Compute progress (% completed tasks) and strip the raw tasks array
+    // Compute progress using flat leaf-level duration-weighted rollup (matches MS Project & task list)
     const projectsWithProgress = projects.map(({ tasks, ...project }) => {
-      const total = tasks.length;
-      const completed = tasks.filter((t) => t.status === 'COMPLETED').length;
-      const progress = total > 0 ? Math.round((completed / total) * 10000) / 100 : 0;
+      const childIds = new Set(tasks.map((t) => t.parentId).filter(Boolean));
+      const leaves = tasks.filter((t) => !childIds.has(t.id));
+      const totalWeight = leaves.reduce((sum, t) => sum + (t.duration ?? 0), 0);
+      let progress: number;
+      if (totalWeight > 0) {
+        const weightedSum = leaves.reduce((sum, t) => sum + (t.progress ?? 0) * (t.duration ?? 0), 0);
+        progress = Math.round(weightedSum / totalWeight);
+      } else {
+        // All milestones fallback: simple average of leaf progress
+        const total = leaves.length;
+        progress = total > 0 ? Math.round(leaves.reduce((s, t) => s + (t.progress ?? 0), 0) / total) : 0;
+      }
       return { ...project, progress };
     });
 

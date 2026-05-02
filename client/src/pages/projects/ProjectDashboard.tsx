@@ -50,7 +50,16 @@ export default function ProjectDashboard({ project }: ProjectDashboardProps) {
   const inProgressTasks = tasks.filter((task: any) => task.status === 'IN_PROGRESS').length;
   const notStartedTasks = tasks.filter((task: any) => task.status === 'NOT_STARTED').length;
   const blockedTasks = tasks.filter((task: any) => task.status === 'BLOCKED').length;
-  const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 10000) / 100 : 0;
+
+  // Flat leaf-level duration-weighted rollup (matches MS Project & task list)
+  const childIds = new Set((tasks as any[]).map((t) => t.parentId).filter(Boolean));
+  const leafTasks = (tasks as any[]).filter((t) => !childIds.has(t.id));
+  const totalWeight = leafTasks.reduce((sum, t) => sum + (t.duration ?? 0), 0);
+  const completionRate = totalWeight > 0
+    ? Math.round(leafTasks.reduce((sum, t) => sum + (t.progress ?? 0) * (t.duration ?? 0), 0) / totalWeight)
+    : leafTasks.length > 0
+      ? Math.round(leafTasks.reduce((sum, t) => sum + (t.progress ?? 0), 0) / leafTasks.length)
+      : 0;
 
   const totalHours = worklogs.reduce((sum: number, log: any) => sum + (log.hours || 0), 0);
   const totalMembers = project.members?.length || 0;

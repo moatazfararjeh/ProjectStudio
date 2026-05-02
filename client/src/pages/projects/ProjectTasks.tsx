@@ -53,6 +53,7 @@ import {
   FieldTimeOutlined,
   LinkOutlined,
   FileExcelOutlined,
+  SyncOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import ExcelJS from 'exceljs';
@@ -258,6 +259,20 @@ export default function ProjectTasks({ project }: ProjectTasksProps) {
     setEditingTask(null);
     form.resetFields();
   };
+
+  const [recalculating, setRecalculating] = useState(false);
+  async function handleRecalculate() {
+    try {
+      setRecalculating(true);
+      await api.recalculateProgress(project.id);
+      await queryClient.invalidateQueries({ queryKey: ['tasks', project.id] });
+      message.success('Progress recalculated successfully');
+    } catch {
+      message.error('Failed to recalculate progress');
+    } finally {
+      setRecalculating(false);
+    }
+  }
 
   const handleCreate = () => {
     setEditingTask(null);
@@ -1069,6 +1084,11 @@ export default function ProjectTasks({ project }: ProjectTasksProps) {
             )}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Tooltip title="Recalculate parent task progress using duration-weighted average">
+              <Button icon={<SyncOutlined />} onClick={handleRecalculate} loading={recalculating} style={{ borderRadius: 8 }}>
+                Recalculate
+              </Button>
+            </Tooltip>
             <Button icon={<UploadOutlined />} onClick={handleImport} style={{ borderRadius: 8 }}>
               Import MPP
             </Button>
