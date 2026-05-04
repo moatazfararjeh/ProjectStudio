@@ -238,6 +238,20 @@ export default function ProjectMeetingMinutes({ project }: Props) {
     }
   }
 
+  async function handleTemplateDownload() {
+    try {
+      const blob = await api.downloadMoMTemplate(project.id);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `mom_template_${project.name.replace(/\s+/g, '_')}.docx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      message.error(t('meetingMinutes.templateDownloadError'));
+    }
+  }
+
   async function handleDefaultLanguageChange(lang: 'AR' | 'EN') {
     setDefaultLanguage(lang);
     try {
@@ -372,6 +386,15 @@ export default function ProjectMeetingMinutes({ project }: Props) {
         {hasTemplate ? (
           <Space>
             <Tag color="green" icon={<FileWordOutlined />}>{t('meetingMinutes.customTemplateActive')}</Tag>
+            <Tooltip title={t('meetingMinutes.downloadTemplateTooltip')}>
+              <Button
+                size="small"
+                icon={<DownloadOutlined />}
+                onClick={handleTemplateDownload}
+              >
+                {t('meetingMinutes.downloadTemplate')}
+              </Button>
+            </Tooltip>
             <Tooltip title={t('meetingMinutes.deleteTemplateTooltip')}>
               <Button
                 size="small"

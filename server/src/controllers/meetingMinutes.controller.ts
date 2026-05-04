@@ -239,6 +239,28 @@ export const uploadMoMTemplate = async (req: AuthRequest, res: Response, next: N
   } catch (err) { next(err); }
 };
 
+// GET /api/projects/:id/meeting-minutes/template/download
+// Sends the current custom MOM template file as a download.
+export const downloadMoMTemplate = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const projectId = String(req.params.id);
+    const project = await prisma.project.findUnique({
+      where: { id: projectId },
+      select: { settings: true },
+    });
+    const currentSettings = (project?.settings as any) || {};
+    const docxTemplatePath = currentSettings?.momTemplate?.docxTemplatePath;
+    if (!docxTemplatePath) {
+      return res.status(404).json({ message: 'No custom template found for this project' });
+    }
+    const filePath = path.join(__dirname, '../../public', docxTemplatePath);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ message: 'Template file not found on server' });
+    }
+    res.download(filePath, `mom_template_${projectId}.docx`);
+  } catch (err) { next(err); }
+};
+
 // DELETE /api/projects/:id/meeting-minutes/template
 // Removes the custom MOM template, reverting to the generated layout.
 export const deleteMoMTemplate = async (req: AuthRequest, res: Response, next: NextFunction) => {

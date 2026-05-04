@@ -507,6 +507,15 @@ class ApiClient {
     const { data } = await this.client.delete(`/projects/${projectId}/meeting-minutes/template`);
     return data;
   }
+
+  /** Download the current custom MOM template .docx file */
+  async downloadMoMTemplate(projectId: string): Promise<Blob> {
+    const response = await this.client.get(
+      `/projects/${projectId}/meeting-minutes/template/download`,
+      { responseType: 'blob' },
+    );
+    return response.data as Blob;
+  }
 }
 
 export const api = new ApiClient();

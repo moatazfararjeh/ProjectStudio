@@ -169,7 +169,7 @@ export default function MainLayout() {
             </div>
           ) : (
             <img
-              src="https://netways.com/img/logoblack.png"
+              src="https://www.netways.com/img/case-studies/LOGO%20-%20netways%20png%202.png"
               alt="Netways"
               className="sider-logo-img"
             />

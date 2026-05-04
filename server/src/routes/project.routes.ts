@@ -28,6 +28,7 @@ import {
   exportMeetingMinutes,
   uploadMoMTemplate,
   deleteMoMTemplate,
+  downloadMoMTemplate,
 } from '../controllers/meetingMinutes.controller';
 
 const router = Router();
@@ -59,6 +60,7 @@ router.post('/:id/meeting-minutes', createMeetingMinutes);
 
 // MOM template routes MUST be declared before /:mid to avoid "template" matching as :mid
 router.post('/:id/meeting-minutes/template', uploadDocxTemplate, uploadMoMTemplate);
+router.get('/:id/meeting-minutes/template/download', downloadMoMTemplate);
 router.delete('/:id/meeting-minutes/template', deleteMoMTemplate);
 
 router.get('/:id/meeting-minutes/:mid', getMeetingMinute);
